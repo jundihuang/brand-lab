@@ -1,0 +1,12 @@
+{
+  "read": {
+    "data": {
+      "product": {
+        "id": "gid://shopify/Product/1",
+        "title": "Old title",
+        "descriptionHtml": "<p>Minigonna leopardo</p>{{size}}",
+        "seo": {"title": "Minigonna leopardo", "description": "Una minigonna leopardo."}
+      }
+    }
+  }
+}

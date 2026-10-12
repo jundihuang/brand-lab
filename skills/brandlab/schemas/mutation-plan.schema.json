@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["batch_id", "mode", "store", "status", "target_locale", "max_batch_size", "operations", "graphql"],
+  "properties": {
+    "batch_id": {"type": "string"},
+    "job_id": {"type": "string"},
+    "mode": {"const": "shopify_controlled"},
+    "store": {"type": "string"},
+    "status": {"enum": ["draft", "ready_for_review", "approved", "executing", "executed", "failed", "cancelled"]},
+    "target_locale": {"type": "string"},
+    "max_batch_size": {"type": "integer", "minimum": 1, "maximum": 10},
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"},
+    "graphql": {"type": "object", "required": ["query", "variables"]},
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item_id", "shopify_resource_id", "resource_type", "field", "before", "after", "source_digest", "approval_digest", "status"],
+        "properties": {
+          "item_id": {"type": "string"},
+          "shopify_resource_id": {"type": "string"},
+          "resource_type": {"type": "string"},
+          "field": {"type": "string"},
+          "before": {"type": "string"},
+          "after": {"type": "string"},
+          "source_digest": {"type": "string"},
+          "approval_digest": {"type": "string"},
+          "status": {"enum": ["planned", "success", "failed", "verified", "mismatched"]},
+          "rollback_source": {"type": "string"},
+          "user_errors": {"type": "array", "items": {"type": "object"}}
+        }
+      }
+    },
+    "approval": {"type": ["object", "null"]},
+    "executions": {"type": "array", "items": {"type": "object"}}
+  }
+}

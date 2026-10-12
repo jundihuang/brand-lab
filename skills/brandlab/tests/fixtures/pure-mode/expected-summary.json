@@ -1,0 +1,19 @@
+{
+  "catalog_item_count": 8,
+  "job_item_count": 8,
+  "approved_item_count": 8,
+  "export_item_count": 8,
+  "approved_only": true,
+  "target_locale": "it-IT",
+  "required_history_events": [
+    "workspace_initialized",
+    "content_imported",
+    "content_audited",
+    "job_created",
+    "translation_prepared",
+    "translation_ingested",
+    "review_generated",
+    "approval_applied",
+    "export_created"
+  ]
+}

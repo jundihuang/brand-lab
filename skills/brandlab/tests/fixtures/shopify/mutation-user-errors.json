@@ -1,0 +1,10 @@
+{
+  "mutation": {
+    "data": {
+      "operation_0": {
+        "product": {"id": "gid://shopify/Product/1"},
+        "userErrors": [{"field": ["title"], "message": "Translation was rejected by Shopify."}]
+      }
+    }
+  }
+}

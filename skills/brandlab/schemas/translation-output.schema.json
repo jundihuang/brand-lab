@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["item_id", "translated_text", "source_digest", "target_locale"],
+  "properties": {
+    "item_id": {"type": "string"},
+    "translated_text": {"type": "string"},
+    "source_digest": {"type": "string"},
+    "source_locale": {"type": "string"},
+    "target_locale": {"type": "string"},
+    "bridge_locale": {"type": ["string", "null"]},
+    "notes": {"type": "string"}
+  }
+}

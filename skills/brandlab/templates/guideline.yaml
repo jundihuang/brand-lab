@@ -1,0 +1,13 @@
+id: GUIDELINE_ID
+name: GUIDELINE_NAME
+resource_type: product_title
+target_locale: it-IT
+market: IT
+status: active
+version: 1
+
+rules:
+  - type: instruction
+    rule: Keep the brand name unchanged.
+  - type: max_length
+    value: 70

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["item_id", "status", "trust_score", "checks"],
+  "properties": {
+    "item_id": {"type": "string"},
+    "status": {"type": "string"},
+    "trust_score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "guideline_versions": {"type": "object"},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "status", "severity"],
+        "properties": {
+          "rule_id": {"type": "string"},
+          "status": {"enum": ["passed", "warning", "failed"]},
+          "severity": {"enum": ["hard", "soft"]},
+          "message": {"type": "string"}
+        }
+      }
+    }
+  }
+}

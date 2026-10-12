@@ -1,0 +1,10 @@
+brand: BRAND_NAME
+mode: pure
+source_language: en
+working_language: zh-CN
+default_tone: premium, confident, minimal
+
+markets:
+  - market: IT
+    locale: it-IT
+    enabled: true

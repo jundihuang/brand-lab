@@ -1,0 +1,17 @@
+id: product-description-it
+name: Product Description — Italian
+resource_type: product_description
+target_locale: it-IT
+market: IT
+status: active
+version: 1
+
+rules:
+  - type: instruction
+    rule: Use a confident premium tone and preserve HTML structure.
+  - type: preserve
+    value: placeholders
+  - type: preserve
+    value: html_tags
+  - type: min_length
+    value: 3

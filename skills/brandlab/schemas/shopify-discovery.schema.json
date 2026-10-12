@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["discovery_id", "store", "created_at", "resources"],
+  "properties": {
+    "discovery_id": {"type": "string"},
+    "store": {"type": "string"},
+    "created_at": {"type": "string"},
+    "query_path": {"type": "string"},
+    "raw_output_path": {"type": ["string", "null"]},
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["shopify_resource_id", "resource_type", "source_locale", "target_locale", "source", "digest"],
+        "properties": {
+          "shopify_resource_id": {"type": "string", "pattern": "^gid://shopify/.+"},
+          "parent_shopify_resource_id": {"type": "string"},
+          "resource_type": {"type": "string"},
+          "external_id": {"type": "string"},
+          "source_locale": {"type": "string"},
+          "target_locale": {"type": "string"},
+          "market": {"type": "string"},
+          "source": {"type": "string"},
+          "digest": {"type": "string"}
+        }
+      }
+    },
+    "markets": {"type": "array", "items": {"type": "object"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

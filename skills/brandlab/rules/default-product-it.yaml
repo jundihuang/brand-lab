@@ -1,0 +1,17 @@
+id: product-title-it
+name: Product Title — Italian
+resource_type: product_title
+target_locale: it-IT
+market: IT
+status: active
+version: 1
+
+rules:
+  - type: instruction
+    rule: Keep the brand name unchanged.
+  - type: preserve
+    value: placeholders
+  - type: max_length
+    value: 80
+  - type: forbidden_regex
+    pattern: "(?i)\\b(saldi|sconto)\\b"

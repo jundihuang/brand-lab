@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["brand", "mode", "source_language", "working_language", "markets"],
+  "properties": {
+    "brand": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["pure", "shopify_controlled"]},
+    "source_language": {"type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"},
+    "working_language": {"type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"},
+    "default_tone": {"type": "string"},
+    "markets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["market", "locale", "enabled"],
+        "properties": {
+          "market": {"type": "string"},
+          "locale": {"type": "string"},
+          "enabled": {"type": "boolean"}
+        }
+      }
+    },
+    "shopify": {"type": "object"}
+  }
+}

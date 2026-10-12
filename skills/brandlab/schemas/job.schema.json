@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["job_id", "status", "mode", "source_locale", "target_locale", "items"],
+  "properties": {
+    "job_id": {"type": "string"},
+    "status": {"enum": ["draft", "ready", "translating", "review", "approved", "exported", "failed", "archived"]},
+    "mode": {"enum": ["pure", "shopify_controlled"]},
+    "source_locale": {"type": "string"},
+    "target_locale": {"type": "string"},
+    "market": {"type": "string"},
+    "filters": {"type": "object"},
+    "guidelines": {"type": "array"},
+    "glossary_digest": {"type": "string"},
+    "glossary": {"type": "array"},
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"},
+    "items": {"type": "array"}
+  }
+}

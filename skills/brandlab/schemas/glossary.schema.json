@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["source_term", "target_term", "target_locale", "status"],
+    "properties": {
+      "source_term": {"type": "string"},
+      "target_term": {"type": "string"},
+      "target_locale": {"type": "string"},
+      "status": {"enum": ["locked", "preferred", "forbidden", "draft"]},
+      "note": {"type": "string"}
+    }
+  }
+}

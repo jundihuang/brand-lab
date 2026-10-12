@@ -1,0 +1,15 @@
+{
+  "data": {
+    "shop": {"name": "Test Store", "primaryLocale": {"isoCode": "en"}},
+    "products": {
+      "edges": [
+        {"node": {
+          "id": "gid://shopify/Product/1",
+          "title": "Leopard-print mini skirt",
+          "descriptionHtml": "<p>Leopard mini skirt</p>{{size}}",
+          "seo": {"title": "Leopard mini skirt", "description": "A leopard mini skirt."}
+        }}
+      ]
+    }
+  }
+}

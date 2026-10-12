@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "name", "resource_type", "target_locale", "status", "version", "rules"],
+  "properties": {
+    "id": {"type": "string"},
+    "name": {"type": "string"},
+    "resource_type": {"type": "string"},
+    "target_locale": {"type": "string"},
+    "market": {"type": "string"},
+    "status": {"enum": ["active", "inactive", "draft"]},
+    "version": {"type": "integer", "minimum": 1},
+    "rules": {"type": "array", "items": {"type": "object"}}
+  }
+}
