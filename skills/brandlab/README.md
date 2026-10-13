@@ -154,6 +154,7 @@ BrandLab 会先给出一份新增市场计划，包括：
 | 翻译体检报告 | `brandlab/reports/` |
 | 修复计划 | `brandlab/corrections/` |
 | 新增市场计划 | `brandlab/onboarding/` |
+| 多市场汇总 | `brandlab/reports/market-translation-summary.md` |
 | Shopify 回写计划 | `brandlab/shopify/mutation-plans/` |
 | 执行记录 | `brandlab/shopify/execution-results/` |
 | 操作历史 | `brandlab/history/events.jsonl` |

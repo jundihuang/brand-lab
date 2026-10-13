@@ -76,3 +76,8 @@ class TranslationWritebackTest(ShopifyModeTestCase):
         self.assertEqual(result["status"], "verified")
         self.assertEqual(plan["operations"][0]["status"], "verified")
         self.assertEqual(manifest["items"][0]["writeback_status"], "verified")
+        self.run_cli("build_market_summary.py", "--workspace", str(workspace))
+        summary = self.load_json(workspace / "reports/market-translation-summary.json")
+        market = next(row for row in summary["markets"] if row["market"] == "IT")
+        self.assertEqual(market["audit"]["counts"]["warning"], 8)
+        self.assertEqual(market["jobs"][0]["writeback_statuses"]["verified"], 1)

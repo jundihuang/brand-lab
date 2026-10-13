@@ -180,6 +180,16 @@ python3 scripts/onboard_market.py --workspace brandlab --market-id US --locale e
 ```
 
 An English source plus `en-US` target is localization-only. BrandLab does not create an English-to-English translation job.
+
+## Cross-market report
+
+After discovery, audit, correction, or writeback work, generate one local summary:
+
+```bash
+python3 scripts/build_market_summary.py --workspace brandlab
+```
+
+It reports each enabled market's discovery coverage, audit counts, correction progress, writeback status, and target-only audit limits.
    ```
 
 ## Validation policy
