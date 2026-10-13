@@ -242,6 +242,14 @@ class ShopifyConnector:
                 )
             errors = response.get("errors")
             if errors:
+                error_text = json.dumps(errors, ensure_ascii=False).casefold()
+                if "access denied" in error_text or "read_translations" in error_text:
+                    required = "read_markets" if "markets(" in query.casefold() else "read_translations"
+                    raise BrandLabError(
+                        f"Shopify permission insufficient for {operation_id}: {required} is required. "
+                        "Grant the missing Shopify scope, reconnect Shopify CLI, and retry. Raw response: "
+                        f"{output_path}."
+                    )
                 raise BrandLabError(f"Shopify GraphQL operation {operation_id} returned errors. Inspect {output_path}.")
         else:
             raise BrandLabError(f"provider {self.provider}: use live or fixture.")

@@ -99,7 +99,55 @@ def choose_any_content(node: dict[str, Any]) -> dict[str, Any] | None:
     return content[0] if isinstance(content, list) and content and isinstance(content[0], dict) else None
 
 
-def snapshot_records(data: dict[str, Any], market_entry: dict[str, Any], source_locale: str, market_id: str, shopify_market_id: str | None) -> tuple[list[dict[str, Any]], list[str]]:
+def load_reference_rows(path: Path | None) -> dict[tuple[str, str], dict[str, Any]]:
+    if path is None:
+        return {}
+    resolved = path.expanduser().resolve()
+    if resolved.suffix.casefold() == ".jsonl":
+        from brandlab_lib import read_jsonl
+        rows = read_jsonl(resolved)
+    else:
+        from brandlab_lib import read_json
+        value = read_json(resolved)
+        rows = value.get("references", []) if isinstance(value, dict) and isinstance(value.get("references"), list) else value
+        if not isinstance(rows, list):
+            raise BrandLabError(f"{resolved}: reference file must contain a JSON array or a references array.")
+    result: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("shopify_resource_id") or not row.get("field_key") or not row.get("source_text"):
+            raise BrandLabError(f"{resolved}: each reference needs shopify_resource_id, field_key, and source_text.")
+        result[(str(row["shopify_resource_id"]), str(row["field_key"]))] = row
+    return result
+
+
+def load_history_references(workspace: Path, job_id: str | None) -> dict[tuple[str, str], dict[str, Any]]:
+    if not job_id:
+        return {}
+    sources_dir = workspace / "jobs" / job_id / "sources"
+    if not sources_dir.is_dir():
+        raise BrandLabError(f"{sources_dir}: history job not found. Check the job ID.")
+    from brandlab_lib import read_json
+    result: dict[tuple[str, str], dict[str, Any]] = {}
+    for path in sources_dir.glob("*.json"):
+        row = read_json(path)
+        resource_id = row.get("shopify_resource_id")
+        field_key = row.get("field_key")
+        if resource_id and field_key and row.get("source_available") is True and row.get("source"):
+            result[(str(resource_id), str(field_key))] = {
+                **row,
+                "source_text": row["source"],
+                "source_origin": "history_job",
+            }
+    if not result:
+        raise BrandLabError(f"{sources_dir}: history job has no matching source references with Shopify resource IDs.")
+    return result
+
+
+def snapshot_records(
+    data: dict[str, Any], market_entry: dict[str, Any], source_locale: str, market_id: str,
+    shopify_market_id: str | None, references: dict[tuple[str, str], dict[str, Any]] | None = None,
+    resource_filter: set[str] | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
     records: list[dict[str, Any]] = []
     warnings: list[str] = []
     resources = data.get('translatableResources') or {}
@@ -119,6 +167,8 @@ def snapshot_records(data: dict[str, Any], market_entry: dict[str, Any], source_
             warnings.append(f'Skipped resource without translatableContent: {resource_id}')
             continue
         translations = node.get('translations')
+        if resource_filter and resource_type(resource_id) not in resource_filter:
+            continue
         for content in contents:
             if not isinstance(content, dict) or not content.get('key'):
                 warnings.append(f'Skipped invalid translatable content on {resource_id}.')
@@ -126,6 +176,21 @@ def snapshot_records(data: dict[str, Any], market_entry: dict[str, Any], source_
             key = value_text(content['key'])
             translation = choose_translation(translations, key, shopify_market_id)
             source = choose_source([content], key, source_locale)
+            external = (references or {}).get((resource_id, key))
+            external_origin = None
+            external_digest = None
+            external_text = None
+            if source is None and external:
+                source = external
+                external_origin = str(external.get('source_origin') or 'uploaded_reference')
+                external_text = value_text(external.get('source_text'))
+                external_digest = value_text(external.get('source_digest')) or None
+            if source is external:
+                source_text = external_text
+                source_digest = external_digest
+            else:
+                source_text = value_text(source.get('value')) if source else ''
+                source_digest = (value_text(source.get('digest')) or None) if source else None
             published = value_text(translation.get('value')) if translation else ''
             records.append({
                 'record_id': f'{resource_id}:{market_id}:{key}',
@@ -137,10 +202,11 @@ def snapshot_records(data: dict[str, Any], market_entry: dict[str, Any], source_
                 'shopify_resource_id': resource_id,
                 'field_key': key,
                 'source_available': bool(source),
-                'source_origin': 'shopify_base' if source else 'none',
+                'source_origin': ('shopify_base' if not external_origin else external_origin) if source else 'none',
                 'source_locale': value_text(source.get('locale')) if source else source_locale,
-                'source_text': value_text(source.get('value')) if source else '',
-                'source_digest': value_text(source.get('digest')) if source else None,
+                'source_text': source_text,
+                'source_digest': source_digest,
+                'source_reference_digest': external_digest,
                 'published_locale': market_entry['locale'],
                 'published_text': published,
                 'published_digest': value_text(translation.get('digest')) if translation and translation.get('digest') else None,
@@ -172,6 +238,8 @@ def discover_existing(args: argparse.Namespace) -> None:
         provider=args.provider,
         fixture=Path(args.fixture).expanduser().resolve() if args.fixture else None,
     )
+    references = load_reference_rows(Path(args.reference_file).expanduser().resolve() if args.reference_file else None)
+    references.update(load_history_references(workspace, args.history_job))
     result = connector.run_graphql(
         QUERY, {'locale': shopify_locale, 'first': args.limit},
         operation_kind='read', operation_id=operation_id,
@@ -184,6 +252,7 @@ def discover_existing(args: argparse.Namespace) -> None:
     records, warnings = snapshot_records(
         data, market_entry, source_locale,
         str(market_entry.get('id') or market_entry['market']), args.shopify_market_id,
+        references, set(args.resource_type) if args.resource_type else None,
     )
     output_dir = workspace / 'shopify' / 'existing-translations'
     market_slug = slug(str(market_entry.get('id') or market_entry['market']))
@@ -211,6 +280,8 @@ def discover_existing(args: argparse.Namespace) -> None:
         'shopify_locale': shopify_locale,
         'shopify_market_id': args.shopify_market_id,
         'source_locale': source_locale,
+        'source_origins': sorted({row['source_origin'] for row in records}),
+        'resource_type_filter': sorted(args.resource_type) if args.resource_type else [],
         'audit_mode': audit_mode,
         'source_availability': availability,
         'record_count': len(records),
@@ -262,6 +333,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--shopify-locale', help='Override Shopify locale for the GraphQL query.')
     parser.add_argument('--shopify-market-id', help='Prefer translations published to this Shopify market ID.')
     parser.add_argument('--source-locale', help='Override source locale; defaults to source_language.')
+    parser.add_argument('--reference-file', help='JSON or JSONL uploaded source references.')
+    parser.add_argument('--history-job', help='Existing BrandLab job ID used as a source reference.')
+    parser.add_argument('--resource-type', nargs='*', help='Optional local resource-type filter.')
     parser.add_argument('--limit', type=int, default=20, help='Maximum Shopify resources to read in this discovery page.')
     parser.add_argument('--provider', default='live', choices=['live', 'fixture'])
     parser.add_argument('--fixture', help='Fixture JSON containing the translatableResources response.')
