@@ -33,6 +33,19 @@ def render_prompt(manifest: dict, guidelines: list[dict], glossary: list[dict], 
             f"- `{row['item_id']}` ({row['resource_type']}): mode={row.get('correction_mode', 'translation')}; "
             f"audit_issues={issue_count}; digest={row['source_digest']}"
         )
+        ai_review = row.get("ai_review")
+        if isinstance(ai_review, dict):
+            item_lines.append(
+                f"  - AI review: mode={ai_review.get('review_mode', '')}; "
+                f"model={ai_review.get('model', '')}; confidence={ai_review.get('confidence', '')}"
+            )
+            for finding in ai_review.get("findings", []):
+                item_lines.append(
+                    f"  - AI finding [{finding.get('severity', '')}] {finding.get('type', '')}: {finding.get('message', '')}"
+                )
+            suggestion = ai_review.get("suggested_text") or ai_review.get("rewrite_suggestion")
+            if suggestion:
+                item_lines.append(f"  - AI suggestion: {suggestion}")
     return "\n".join([
         "# Market Translation Correction Prompt" if correction else "# Translation Prompt", "",
         f"- Job: `{manifest['job_id']}`", f"- Direction: {manifest['source_locale']} → {manifest['target_locale']}",
@@ -75,6 +88,7 @@ def prepare_translation(workspace: Path, job_dir: Path, manifest: dict) -> tuple
                 "published_text": source.get("published_text", ""), "source_available": source.get("source_available") is True,
                 "audit_mode": source.get("audit_mode"), "correction_mode": job_item.get("correction_mode", "fix"),
                 "audit_issues": audit.get("checks", []), "unverifiable_checks": audit.get("unverifiable_checks", []),
+                "ai_review": audit.get("ai_review"),
             })
         worklist.append(row)
     if not worklist:

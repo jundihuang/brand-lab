@@ -85,6 +85,46 @@ class CorrectionJobTest(ShopifyModeTestCase):
         self.assertEqual(approved["status"], "approved")
         self.assertEqual(approved["items"][0]["status"], "approved")
 
+    def test_ai_review_context_flows_into_correction_prompt_and_review(self) -> None:
+        workspace = self.temp_workspace()
+        self.init_shopify(workspace)
+        self.run_cli(
+            "shopify_discover_existing.py", "--workspace", str(workspace), "--market", "IT",
+            "--provider", "fixture", "--fixture", str(FIXTURES / "existing-translations-paired.json"),
+            "--limit", "10",
+        )
+        self.run_cli("audit_existing_translations.py", "--workspace", str(workspace), "--market", "IT")
+        report = json.loads((workspace / "reports/existing-translation-audit-it.json").read_text())
+        item = report["items"][0]
+        review_path = workspace / "ai-review.json"
+        review_path.write_text(json.dumps({"reviews": [{
+            "item_id": item["item_id"], "review_mode": "paired_source", "model": "test-model",
+            "confidence": 0.9, "source_digest": item["source_digest"],
+            "published_digest": item["published_digest"],
+            "findings": [{"type": "mistranslation", "severity": "critical", "message": "Wrong material."}],
+            "suggested_text": "Minigonna corretta", "recommendation": "retranslate",
+        }]}), encoding="utf-8")
+        self.run_cli(
+            "audit_existing_translations.py", "--workspace", str(workspace), "--market", "IT",
+            "--ai-review", str(review_path),
+        )
+        report = json.loads((workspace / "reports/existing-translation-audit-it.json").read_text())
+        item = report["items"][0]
+        self.run_cli(
+            "create_correction_job.py", "--workspace", str(workspace), "--market", "IT",
+            "--ids", item["item_id"], "--mode", "retranslate", "--job-id", "correction-ai",
+        )
+        self.run_cli("translate_job.py", "--workspace", str(workspace), "--job", "correction-ai")
+        prompt = (workspace / "jobs/correction-ai/translation-prompt.md").read_text()
+        self.assertIn("AI review: mode=paired_source", prompt)
+        self.assertIn("Wrong material.", prompt)
+        self.assertIn("Minigonna corretta", prompt)
+        self.run_cli("build_review.py", "--workspace", str(workspace), "--job", "correction-ai")
+        review = (workspace / "jobs/correction-ai/review.md").read_text()
+        self.assertIn("### AI review", review)
+        self.assertIn("test-model", review)
+        self.assertIn("Minigonna corretta", review)
+
     def test_target_only_rewrite_does_not_require_source(self) -> None:
         workspace = self.temp_workspace()
         self.init_shopify(workspace)

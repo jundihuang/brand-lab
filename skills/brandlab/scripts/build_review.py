@@ -49,12 +49,28 @@ def build_review(args: argparse.Namespace) -> None:
             message = str(check.get("message", "")).replace("|", "\\|").replace("\n", " ")
             checks_table.append(f"| `{check['rule_id']}` | {check['status']} | {check['severity']} | {message} |")
         correction = manifest.get("job_type") == "market_translation_correction"
+        ai_review = source_snapshot.get("audit", {}).get("ai_review") if correction else None
         correction_lines = [
             f"- Correction mode: `{job_item.get('correction_mode', 'fix')}`",
             f"- Audit mode: `{source_snapshot.get('audit_mode', '')}`",
             f"- Source reference available: `{source_snapshot.get('source_available') is True}`",
             "### Published text", "", "```text", source_snapshot.get("published_text", ""), "```", "",
         ] if correction else []
+        if isinstance(ai_review, dict):
+            correction_lines.extend([
+                "### AI review", "",
+                f"- Mode: `{ai_review.get('review_mode', '')}`",
+                f"- Model: `{ai_review.get('model', '')}`",
+                f"- Confidence: `{ai_review.get('confidence', '')}`", "",
+            ])
+            for finding in ai_review.get("findings", []):
+                correction_lines.append(
+                    f"- [{finding.get('severity', '')}] {finding.get('type', '')}: {finding.get('message', '')}"
+                )
+            suggestion = ai_review.get("suggested_text") or ai_review.get("rewrite_suggestion")
+            if suggestion:
+                correction_lines.extend(["", "```text", suggestion, "```"])
+            correction_lines.append("")
         item_sections.append("\n".join([
             f"## `{item_id}`", "",
             f"- Resource: `{source_snapshot.get('resource_type', '')}`",
