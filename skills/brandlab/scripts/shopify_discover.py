@@ -20,7 +20,7 @@ SUPPORTED_RESOURCES = {"product", "collection", "page", "blog", "market"}
 
 
 def resource_query(resources: set[str], first: int = 25) -> str:
-    sections = ["query BrandLabDiscovery {", "  shop { name primaryLocale { isoCode } }"]
+    sections = ["query BrandLabDiscovery {", "  shopLocales { locale name primary published }"]
     if "product" in resources:
         sections += [
             "  products(first: %d) { edges { node {" % first,
@@ -217,13 +217,19 @@ def discover(args: argparse.Namespace) -> None:
     response = result["response"]
     data = response.get("data")
     if not isinstance(data, dict):
+        # Shopify CLI store execute returns fields at the top level without a "data" wrapper.
+        data = response if isinstance(response, dict) else {}
+    if not data:
         raise BrandLabError(f"Discovery {operation_id}: Shopify response data is missing. Inspect {result['output_path']}.")
     raw_records, warnings = resource_records(data, target_locale, market)
     if not raw_records and requested != {"market"}:
         raise BrandLabError(f"Discovery {operation_id}: no translatable fields were returned. Check the query or fixture.")
 
+    _locales = data.get("shopLocales") or []
+    _primary = next((l.get("locale") for l in _locales if isinstance(l, dict) and l.get("primary")), None)
+    _source = args.source_locale or _primary or "en"
     for record in raw_records:
-        record["source_locale"] = args.source_locale or ((data.get("shop") or {}).get("primaryLocale") or {}).get("isoCode", "") if isinstance((data.get("shop") or {}).get("primaryLocale"), dict) else args.source_locale or "en"
+        record["source_locale"] = _source
     records_path = workspace / "shopify" / "discovery" / f"{operation_id}-resources.jsonl"
     write_jsonl(records_path, raw_records)
     new_count, changed_count, unchanged_count = import_discovery(workspace, raw_records)

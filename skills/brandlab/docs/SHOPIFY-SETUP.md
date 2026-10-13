@@ -9,7 +9,7 @@ BrandLab does not manage OAuth and never stores or displays Shopify tokens. Auth
 ```bash
 node --version
 shopify version
-codex plugin list | grep 'shopify@openai-curated'
+codex plugin list | grep 'shopify-plugin@shopify-ai-toolkit'
 ```
 
 ## Install missing prerequisites
@@ -23,7 +23,7 @@ npm install -g @shopify/cli@latest
 Install the Shopify AI Toolkit plugin only after you understand the command:
 
 ```bash
-codex plugin add shopify@openai-curated
+codex plugin add shopify-plugin@shopify-ai-toolkit
 ```
 
 Authenticate with Shopify CLI:

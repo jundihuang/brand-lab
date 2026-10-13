@@ -25,7 +25,7 @@ class ShopifySetupTest(ShopifyModeTestCase):
         self.assertFalse(brand["shopify"]["setup_completed"])
         self.assertFalse(brand["shopify"]["allow_reads"])
         self.assertFalse(brand["shopify"]["allow_mutations"])
-        self.assertIn("codex plugin add shopify@openai-curated", (workspace / "shopify/setup-report.md").read_text())
+        self.assertIn("codex plugin add shopify-plugin@shopify-ai-toolkit", (workspace / "shopify/setup-report.md").read_text())
         self.assertIn("shopify_setup_completed", self.history_events(workspace))
 
     def test_successful_fixture_setup_enables_reads_but_not_mutations(self) -> None:

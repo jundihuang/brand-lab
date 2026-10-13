@@ -14,14 +14,14 @@ from brandlab_lib import (
 )
 from shopify_connector import ShopifyConnector
 
-QUERY = '''query ExistingTranslations($locale: String!, $first: Int!) {
-  shop {
-    primaryLocale {
-      isoCode
-      name
-    }
+QUERY = '''query ExistingTranslations($locale: String!, $first: Int!, $resourceType: TranslatableResourceType!) {
+  shopLocales {
+    locale
+    name
+    primary
+    published
   }
-  translatableResources(first: $first) {
+  translatableResources(first: $first, resourceType: $resourceType) {
     nodes {
       resourceId
       translatableContent {
@@ -33,7 +33,7 @@ QUERY = '''query ExistingTranslations($locale: String!, $first: Int!) {
       translations(locale: $locale) {
         key
         value
-        marketId
+        market { id }
         outdated
         updatedAt
       }
@@ -66,16 +66,23 @@ def resource_type(resource_id: str) -> str:
     return re.sub(r'(?<!^)(?=[A-Z])', '_', kind).casefold()
 
 
+def _market_id(row: dict[str, Any]) -> str | None:
+    market = row.get('market')
+    if isinstance(market, dict):
+        return value_text(market.get('id')) or None
+    return None
+
+
 def choose_translation(rows: Any, key: str, shopify_market_id: str | None) -> dict[str, Any] | None:
     if not isinstance(rows, list):
         return None
     matches = [row for row in rows if isinstance(row, dict) and row.get('key') == key]
     if shopify_market_id:
         for row in matches:
-            if value_text(row.get('marketId')) == shopify_market_id:
+            if _market_id(row) == shopify_market_id:
                 return row
     for row in matches:
-        if row.get('marketId') is None:
+        if _market_id(row) is None:
             return row
     return matches[0] if matches else None
 
@@ -241,13 +248,17 @@ def discover_existing(args: argparse.Namespace) -> None:
     )
     references = load_reference_rows(Path(args.reference_file).expanduser().resolve() if args.reference_file else None)
     references.update(load_history_references(workspace, args.history_job))
+    variables: dict[str, Any] = {'locale': shopify_locale, 'first': args.limit, 'resourceType': 'PRODUCT'}
     result = connector.run_graphql(
-        QUERY, {'locale': shopify_locale, 'first': args.limit},
+        QUERY, variables,
         operation_kind='read', operation_id=operation_id,
     )
     response = result['response']
     data = response.get('data')
     if not isinstance(data, dict):
+        # Shopify CLI store execute returns fields at the top level without a "data" wrapper.
+        data = response if isinstance(response, dict) else {}
+    if not data:
         raise BrandLabError(f"Discovery {operation_id}: Shopify response data is missing. Inspect {result['output_path']}.")
 
     records, warnings = snapshot_records(

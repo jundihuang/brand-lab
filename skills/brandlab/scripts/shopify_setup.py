@@ -64,7 +64,7 @@ def run_checks(args: argparse.Namespace) -> tuple[list[tuple[str, bool, str]], d
         cli_version = version_number(stdout + stderr)
         plugin_code, plugin_stdout, plugin_stderr = default_runner(["codex", "plugin", "list"])
         combined = plugin_stdout + plugin_stderr
-        ai_ok = bool(re.search(r"shopify@openai-curated\s+installed,\s+enabled", combined, flags=re.I))
+        ai_ok = bool(re.search(r"(?:shopify@openai-curated|shopify-plugin@shopify-ai-toolkit)\s+installed,\s+enabled", combined, flags=re.I))
         store_ok = False
         if args.store and cli_version:
             info_code, info_stdout, info_stderr = default_runner(["shopify", "store", "info", "--store", args.store])
@@ -82,7 +82,7 @@ def run_checks(args: argparse.Namespace) -> tuple[list[tuple[str, bool, str]], d
     ))
     checks.append((
         "Shopify AI Toolkit plugin", ai_ok,
-        "Installed and enabled." if ai_ok else "Run: codex plugin add shopify@openai-curated",
+        "Installed and enabled." if ai_ok else "Run: codex plugin add shopify-plugin@shopify-ai-toolkit",
     ))
     checks.append((
         "Shopify CLI store authentication", store_ok,
@@ -157,7 +157,7 @@ def render_report(
         "guidance": "\n".join([
             "```bash",
             "npm install -g @shopify/cli@latest",
-            "codex plugin add shopify@openai-curated",
+            "codex plugin add shopify-plugin@shopify-ai-toolkit",
             "shopify store auth",
             "shopify store info --store YOUR_STORE.myshopify.com",
             "```",
