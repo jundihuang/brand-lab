@@ -19,18 +19,18 @@ from shopify_connector import ShopifyConnector
 SUPPORTED_RESOURCES = {"product", "collection", "page", "blog", "market"}
 
 
-def resource_query(resources: set[str], first: int = 25) -> str:
+def resource_query(resources: set[str], first: int = 100) -> str:
     sections = ["query BrandLabDiscovery {", "  shopLocales { locale name primary published }"]
     if "product" in resources:
         sections += [
-            "  products(first: %d) { edges { node {" % first,
+            "  products(first: %d) { pageInfo { hasNextPage } edges { node {" % first,
             "    id title descriptionHtml",
             "    seo { title description }",
             "  } } }",
         ]
     if "collection" in resources:
         sections += [
-            "  collections(first: %d) { edges { node {" % first,
+            "  collections(first: %d) { pageInfo { hasNextPage } edges { node {" % first,
             "    id title descriptionHtml",
             "  } } }",
         ]

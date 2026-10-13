@@ -14,14 +14,18 @@ from brandlab_lib import (
 )
 from shopify_connector import ShopifyConnector
 
-QUERY = '''query ExistingTranslations($locale: String!, $first: Int!, $resourceType: TranslatableResourceType!) {
+QUERY = '''query ExistingTranslations($locale: String!, $first: Int!, $resourceType: TranslatableResourceType!, $after: String) {
   shopLocales {
     locale
     name
     primary
     published
   }
-  translatableResources(first: $first, resourceType: $resourceType) {
+  translatableResources(first: $first, resourceType: $resourceType, after: $after) {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
     nodes {
       resourceId
       translatableContent {
@@ -248,21 +252,47 @@ def discover_existing(args: argparse.Namespace) -> None:
     )
     references = load_reference_rows(Path(args.reference_file).expanduser().resolve() if args.reference_file else None)
     references.update(load_history_references(workspace, args.history_job))
-    variables: dict[str, Any] = {'locale': shopify_locale, 'first': args.limit, 'resourceType': 'PRODUCT'}
-    result = connector.run_graphql(
-        QUERY, variables,
-        operation_kind='read', operation_id=operation_id,
-    )
-    response = result['response']
-    data = response.get('data')
-    if not isinstance(data, dict):
-        # Shopify CLI store execute returns fields at the top level without a "data" wrapper.
-        data = response if isinstance(response, dict) else {}
-    if not data:
-        raise BrandLabError(f"Discovery {operation_id}: Shopify response data is missing. Inspect {result['output_path']}.")
+
+    all_data: dict[str, Any] = {}
+    merged_resources: list[dict[str, Any]] = []
+    page_info: dict[str, Any] = {}
+    cursor: str | None = None
+    page_number = 0
+    max_pages = 100
+    while page_number < max_pages:
+        variables: dict[str, Any] = {
+            'locale': shopify_locale, 'first': args.limit, 'resourceType': 'PRODUCT',
+        }
+        if cursor:
+            variables['after'] = cursor
+        page_op_id = f"{operation_id}_p{page_number}" if page_number else operation_id
+        result = connector.run_graphql(
+            QUERY, variables,
+            operation_kind='read', operation_id=page_op_id,
+        )
+        response = result['response']
+        data = response.get('data')
+        if not isinstance(data, dict):
+            # Shopify CLI store execute returns fields at the top level without a "data" wrapper.
+            data = response if isinstance(response, dict) else {}
+        if not data:
+            raise BrandLabError(f"Discovery {page_op_id}: Shopify response data is missing. Inspect {result['output_path']}.")
+        if not all_data:
+            for key, value in data.items():
+                if key != 'translatableResources':
+                    all_data[key] = value
+        resources = data.get('translatableResources')
+        if isinstance(resources, dict):
+            merged_resources.extend(resources.get('nodes') or [])
+            page_info = resources.get('pageInfo') or {}
+            cursor = page_info.get('endCursor') if isinstance(page_info, dict) else None
+        page_number += 1
+        if not (isinstance(page_info, dict) and page_info.get('hasNextPage') and cursor):
+            break
+    all_data['translatableResources'] = {'nodes': merged_resources}
 
     records, warnings = snapshot_records(
-        data, market_entry, source_locale,
+        all_data, market_entry, source_locale,
         str(market_entry.get('id') or market_entry['market']), args.shopify_market_id,
         references, set(args.resource_type) if args.resource_type else None,
         shopify_locale_override=shopify_locale,

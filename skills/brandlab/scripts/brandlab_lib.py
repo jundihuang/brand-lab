@@ -208,6 +208,7 @@ def normalize_market_registry(brand: dict[str, Any], config_path: Path) -> dict[
             "shopify_locale": shopify_locale,
             "enabled": raw["enabled"] is True,
             "source_strategy": source_strategy,
+            "bridge_locale": str(raw.get("bridge_locale") or "") or None,
             "translation_mode": translation_mode,
             "review_required": review_required,
             "audit_policy": audit_policy,

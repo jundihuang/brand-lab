@@ -207,6 +207,7 @@ def normalize_ai_review(value: dict[str, Any], row: dict[str, Any], path: Path, 
 def audit_one(
     row: dict[str, Any], market_entry: dict[str, Any], guidelines: list[dict[str, Any]],
     glossary: list[dict[str, str]], ai_review: dict[str, Any] | None = None,
+    audit_policy: str = "standard",
 ) -> dict[str, Any]:
     paired = row.get('audit_mode') == 'paired_source'
     source = str(row.get('source_text') or '')
@@ -256,6 +257,18 @@ def audit_one(
             checks.append(make_check('untranslated_source', 'warning', 'hard', 'Published text is identical to the source reference.'))
         else:
             checks.append(make_check('untranslated_source', 'passed', 'hard'))
+    if audit_policy == 'seo_and_legal' and paired:
+        seo_fields = {'meta_title', 'meta_description', 'seo_title', 'seo_description'}
+        if str(row.get('field_key') or '') in seo_fields:
+            if len(published.strip()) > 160:
+                checks.append(make_check('seo_length', 'warning', 'soft', f'SEO content exceeds 160 chars ({len(published.strip())}).'))
+            else:
+                checks.append(make_check('seo_length', 'passed', 'soft'))
+        legal_terms = {'patent', 'trademark', 'copyright', 'warranty', 'liability'}
+        for term in legal_terms:
+            if term in source.lower() and term not in published.lower():
+                checks.append(make_check('legal_term_parity', 'warning', 'soft', f'Legal term "{term}" in source is missing from published.'))
+    if paired:
         if ai_review:
             checks.append(make_check('semantic_equivalence', 'passed', 'soft', 'Checked by optional AI Review.'))
         else:
@@ -368,10 +381,11 @@ def audit(args: argparse.Namespace) -> None:
     glossary = read_glossary(workspace / 'glossary' / 'glossary.csv')
     ai_review_path = Path(args.ai_review).expanduser().resolve() if args.ai_review else None
     ai_reviews = load_ai_reviews(ai_review_path, rows) if ai_review_path else {}
+    audit_policy = str(market_entry.get('audit_policy') or 'standard')
     results = [
         audit_one(row, market_entry, guidelines, glossary, ai_reviews.get(
             slug(str(row.get('record_id') or f"{row.get('shopify_resource_id')}:{row.get('field_key')}"))
-        ))
+        ), audit_policy=audit_policy)
         for row in rows
     ]
     counts = Counter(item['status'] for item in results)

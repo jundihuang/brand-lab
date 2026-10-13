@@ -29,6 +29,15 @@ def build_summary(args: argparse.Namespace) -> None:
         market_slug = slug(market_id)
         manifest = load_json_if_exists(workspace / "shopify/existing-translations" / f"{market_slug}-latest.json")
         audit = load_json_if_exists(workspace / "reports" / f"existing-translation-audit-{market_slug}.json")
+        ai_review_stats = {}
+        if audit and isinstance(audit.get("items"), list):
+            for item in audit["items"]:
+                if not isinstance(item, dict):
+                    continue
+                review = item.get("ai_review")
+                if review and isinstance(review, dict):
+                    verdict = review.get("verdict") or "unknown"
+                    ai_review_stats[verdict] = ai_review_stats.get(verdict, 0) + 1
         jobs = []
         for manifest_path in sorted((workspace / "jobs").glob("*/manifest.json")):
             try:
@@ -71,6 +80,7 @@ def build_summary(args: argparse.Namespace) -> None:
                     for check in item.get("unverifiable_checks", [])
                 }),
             },
+            "ai_review": ai_review_stats,
             "jobs": jobs, "writeback_plans": plans,
         })
 

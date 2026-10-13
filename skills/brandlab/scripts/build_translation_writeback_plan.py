@@ -48,8 +48,9 @@ def build_plan(args: argparse.Namespace) -> None:
     job_dir, manifest = load_job(workspace, args.job)
     if manifest.get("job_type") != "market_translation_correction":
         raise BrandLabError(f"{job_dir / 'manifest.json'}: only market_translation_correction jobs can use Translation API writeback.")
-    if manifest.get("translation_mode") == "localization_only" or manifest.get("correction_mode") == "localize":
-        raise BrandLabError(f"{job_dir / 'manifest.json'}: localization-only corrections need an audit/review workflow, not a translation mutation.")
+    # All correction modes (fix, retranslate, rewrite, localize) go through the same
+    # Translation API safety gates: approved translations -> approved plan -> digest
+    # check -> explicit --execute -> read-back verification.
     if manifest.get("mode") != "shopify_controlled" or manifest.get("status") != "approved":
         raise BrandLabError(f"{job_dir / 'manifest.json'}: job must be approved Shopify Controlled mode before planning writeback.")
     connector = ShopifyConnector(workspace, provider=args.provider, fixture=Path(args.fixture).resolve() if args.fixture else None)
