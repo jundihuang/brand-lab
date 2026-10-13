@@ -1,11 +1,32 @@
 ---
 name: brandlab-translation
-description: Initialize a file-based brand translation workspace, import content, apply brand guidelines and glossary, translate, validate, review, approve, export, and optionally execute approved product updates through Shopify CLI.
+description: Help operators translate brand content such as products, pages, blogs, and SEO fields using brand guidelines and glossaries; validate, review, approve, export approved content, and optionally write approved product updates back to Shopify.
 ---
 
 # BrandLab Translation Skill
 
 BrandLab is file-first. Treat `brandlab/` as the source of truth. Do not invent backend state.
+
+## Communication style
+
+The default user is an e-commerce operator, not a developer.
+
+1. Reply in the user's language.
+2. Lead with the business outcome: what will be translated, checked, reviewed, exported, or written back.
+3. Ask only for information needed to proceed, such as source language, target language, market, file location, or store.
+4. Do not expose internal terms such as Pure Skill Mode, mutation plan, JSONL, digest, or Python script names unless the user asks for technical detail or the command is required for installation, authorization, or confirmation.
+5. Use operator-friendly equivalents: “普通内容翻译”, “Shopify 回写”, “回写计划”, “审核文件”, and “操作记录”.
+6. When approval is needed, summarize the target language, item count, affected fields, risks, and the exact confirmation the user should give.
+7. End with a concise next action.
+
+Example operator-facing summary:
+
+```text
+已导入 24 条英文商品内容，准备翻译成意大利语。
+下一步：我会先生成审核文件；在你批准前，不会导出或写回 Shopify。
+```
+
+Show commands only when they are necessary for setup, troubleshooting, or an explicit execution gate.
 
 ## Operating rules
 
