@@ -116,6 +116,30 @@ BrandLab 会生成翻译体检报告，告诉你：
 
 修复任务也会先生成审核文件；你批准前，它不会导出或修改 Shopify。
 
+## 新增市场
+
+你可以说：
+
+```text
+新增 US 市场，语言是 English。
+```
+
+BrandLab 会先给出一份新增市场计划，包括：
+
+- Shopify 市场和语言是否可用
+- 应该做翻译，还是只做本地化检查
+- 品牌配置的调整内容
+- 推荐的品牌规则和术语表
+- 后续内容扫描或体检计划
+
+`en → en-US` 只做本地化检查，不会生成“英文翻译成英文”的任务。
+
+你确认后，再说：
+
+```text
+确认新增这个市场。
+```
+
 ## 结果在哪里
 
 | 内容 | 位置 |
@@ -128,6 +152,7 @@ BrandLab 会生成翻译体检报告，告诉你：
 | 已有市场翻译 | `brandlab/shopify/existing-translations/` |
 | 翻译体检报告 | `brandlab/reports/` |
 | 修复计划 | `brandlab/corrections/` |
+| 新增市场计划 | `brandlab/onboarding/` |
 | Shopify 回写计划 | `brandlab/shopify/mutation-plans/` |
 | 执行记录 | `brandlab/shopify/execution-results/` |
 | 操作历史 | `brandlab/history/events.jsonl` |

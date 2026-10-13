@@ -1,0 +1,25 @@
+{
+  "data": {
+    "markets": {
+      "nodes": [
+        {
+          "id": "gid://shopify/Market/US",
+          "handle": "us",
+          "name": "United States",
+          "status": "ACTIVE",
+          "type": "single_country",
+          "webPresences": {
+            "nodes": [
+              {
+                "id": "gid://shopify/MarketWebPresence/1",
+                "subfolderSuffix": "us",
+                "defaultLocale": {"locale": "en", "name": "English", "primary": true, "published": true},
+                "alternateLocales": []
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

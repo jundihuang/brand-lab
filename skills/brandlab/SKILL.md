@@ -146,6 +146,30 @@ Use this workflow when a market such as MX or IT already has translations. Disco
 4. Reuse the standard translation, review, and approval workflow. A correction review shows the published text, source reference availability, audit mode, correction mode, and whether semantic validation is available.
 
 Market corrections do not yet write back with Shopify Translation API. Stop after approval or create a separate human-confirmed migration task.
+
+## Market onboarding
+
+Use this workflow after the user asks to add a market. Always create and show the onboarding plan first.
+
+```bash
+python3 scripts/onboard_market.py --workspace brandlab --market-id US --locale en-US
+```
+
+The command identifies:
+
+- whether Shopify market and locale are active
+- whether this is translation or localization-only
+- the complete `brand.yaml` update
+- guideline and glossary recommendations
+- the content scan or audit plan
+
+Apply the registry change only after explicit confirmation:
+
+```bash
+python3 scripts/onboard_market.py --workspace brandlab --market-id US --locale en-US --confirm-update
+```
+
+An English source plus `en-US` target is localization-only. BrandLab does not create an English-to-English translation job.
    ```
 
 ## Validation policy
