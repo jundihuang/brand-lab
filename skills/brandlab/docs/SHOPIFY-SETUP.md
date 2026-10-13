@@ -29,7 +29,7 @@ codex plugin add shopify@openai-curated
 Authenticate with Shopify CLI:
 
 ```bash
-shopify store auth
+shopify store auth --store jayce-plus-store
 ```
 
 ## Configure BrandLab
@@ -37,7 +37,7 @@ shopify store auth
 ```bash
 python3 scripts/shopify_setup.py \
   --workspace brandlab \
-  --store your-store.myshopify.com \
+  --store jayce-plus-store.myshopify.com \
   --allow-reads
 ```
 
@@ -130,3 +130,5 @@ The command without `--execute` is only a preflight. Before real execution, Bran
 3. Mutations require approved translations, an approved plan, enabled mutation capability, and separate `--execute`.
 4. Destructive operations are blocked in MVP.
 5. Use a Shopify test store for the first live smoke test.
+6. Current validation store is `jayce-plus-store` (`jayce-plus-store.myshopify.com`).
+7. Do not use `ulikeofficial` for development, testing, or smoke validation.
