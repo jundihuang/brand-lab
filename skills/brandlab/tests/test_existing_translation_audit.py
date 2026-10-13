@@ -45,7 +45,7 @@ class ExistingTranslationAuditTest(ShopifyModeTestCase):
         silk = next(item for item in report['items'] if item['shopify_resource_id'].endswith('456'))
         self.assertEqual(silk['audit_mode'], 'paired_source')
         self.assertEqual(silk['status'], 'warning')
-        self.assertEqual(silk['recommendation'], 'manual_review')
+        self.assertEqual(silk['recommendation'], 'retranslate')
         self.assertIn('untranslated_source', {check['rule_id'] for check in silk['checks']})
         markdown = (workspace / 'reports/existing-translation-audit-IT.md').read_text()
         self.assertIn('Audit mode:', markdown)

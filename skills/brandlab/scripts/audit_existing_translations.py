@@ -157,7 +157,12 @@ def audit_one(row: dict[str, Any], market_entry: dict[str, Any], guidelines: lis
         non_source_warnings = [check for check in warnings if check['rule_id'] != 'source_reference']
         if paired:
             status = 'warning'
-            recommendation = 'manual_review'
+            if any(check['rule_id'] == 'untranslated_source' for check in warnings):
+                recommendation = 'retranslate'
+            elif any(check['rule_id'] not in {'semantic_equivalence', 'source_reference'} for check in warnings):
+                recommendation = 'fix'
+            else:
+                recommendation = 'manual_review'
         elif non_source_warnings:
             status = 'warning'
             recommendation = 'manual_review'
@@ -189,6 +194,7 @@ def base_result(row: dict[str, Any], market_entry: dict[str, Any]) -> dict[str, 
         'field_key': row.get('field_key', ''),
         'source_available': row.get('source_available') is True,
         'source_origin': row.get('source_origin') or ('shopify_base' if paired else 'none'),
+        'source_locale': row.get('source_locale') if paired else None,
         'source_text': row.get('source_text') or '',
         'source_digest': row.get('source_digest'),
         'published_text': row.get('published_text') or '',

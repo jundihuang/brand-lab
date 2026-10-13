@@ -18,6 +18,7 @@
           "item_id":{"type":"string"},
           "audit_mode":{"enum":["paired_source","target_only"]},
           "source_available":{"type":"boolean"},
+          "source_locale":{"type":["string","null"]},
           "source_origin":{"type":["string","null"]},
           "status":{"enum":["pass","warning","fail","missing","source_missing"]},
           "recommendation":{"enum":["keep","fix","retranslate","rewrite","localize","manual_review","add_reference"]},

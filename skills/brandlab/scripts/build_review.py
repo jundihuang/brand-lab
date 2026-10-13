@@ -30,12 +30,12 @@ def build_review(args: argparse.Namespace) -> None:
         status_counts[job_item["status"]] += 1
         source_snapshot = read_json(job_dir / job_item["source_path"])
         source = source_snapshot.get("source", "")
-        if Path(job_item["translation_path"]).is_file():
+        if (job_dir / job_item["translation_path"]).is_file():
             translation = read_json(job_dir / job_item["translation_path"])
             output = translation.get("translated_text", "")
         else:
             output = ""
-        if Path(job_item["audit_path"]).is_file():
+        if (job_dir / job_item["audit_path"]).is_file():
             audit = read_json(job_dir / job_item["audit_path"])
             checks = audit.get("checks", [])
             score = int(audit.get("trust_score", 0))
@@ -48,22 +48,36 @@ def build_review(args: argparse.Namespace) -> None:
         for check in checks:
             message = str(check.get("message", "")).replace("|", "\\|").replace("\n", " ")
             checks_table.append(f"| `{check['rule_id']}` | {check['status']} | {check['severity']} | {message} |")
+        correction = manifest.get("job_type") == "market_translation_correction"
+        correction_lines = [
+            f"- Correction mode: `{job_item.get('correction_mode', 'fix')}`",
+            f"- Audit mode: `{source_snapshot.get('audit_mode', '')}`",
+            f"- Source reference available: `{source_snapshot.get('source_available') is True}`",
+            "### Published text", "", "```text", source_snapshot.get("published_text", ""), "```", "",
+        ] if correction else []
         item_sections.append("\n".join([
             f"## `{item_id}`", "",
             f"- Resource: `{source_snapshot.get('resource_type', '')}`",
+            *correction_lines,
             f"- Status: `{job_item['status']}`",
             f"- Trust Score: {score}",
             f"- Suggested decision: {decision(checks)}", "",
-            "### Source", "", "```text", source, "```", "",
+            "### Source reference" if correction else "### Source", "", "```text", source, "```", "",
             "### Translation", "", "```text", output, "```", "",
             "### Checks", "", *checks_table, "",
         ]))
 
     template = [
-        "# Translation Review", "",
+        "# Market Translation Correction Review" if manifest.get("job_type") == "market_translation_correction" else "# Translation Review", "",
         f"- Job: `{manifest['job_id']}`",
         f"- Status: `{manifest['status']}`",
         f"- Direction: `{manifest['source_locale']} → {manifest['target_locale']}`",
+        *((
+            f"- Audit: `{manifest.get('audit_id', '')}`",
+            f"- Audit mode: `{manifest.get('audit_mode', '')}`",
+            f"- Correction mode: `{manifest.get('correction_mode', '')}`",
+            f"- Semantic validation available: `{manifest.get('semantic_validation_available') is True}`",
+        ) if manifest.get("job_type") == "market_translation_correction" else ()),
         f"- Glossary digest: `{manifest.get('glossary_digest', '')}`", "",
         "## Summary", "",
         "| Status | Count |", "|---|---:|",

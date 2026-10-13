@@ -1,6 +1,6 @@
 ---
 name: brandlab-translation
-description: Help operators translate brand content such as products, pages, blogs, and SEO fields using brand guidelines and glossaries; validate, review, approve, export approved content, and optionally write approved product updates back to Shopify.
+description: Help operators translate, audit, and correct brand content such as products, pages, blogs, and SEO fields using brand guidelines and glossaries; validate, review, approve, export approved content, and optionally write approved product updates back to Shopify.
 ---
 
 # BrandLab Translation Skill
@@ -118,6 +118,34 @@ If the user has no source files, ask them to place CSV, JSON, JSONL, Markdown, H
 
    ```bash
    python3 scripts/build_export.py --workspace brandlab --job JOB_ID --format shopify_csv
+
+## Existing market translation audit
+
+Use this workflow when a market such as MX or IT already has translations. Discovery and audit are read-only.
+
+1. Discover published Shopify translations:
+
+   ```bash
+   python3 scripts/shopify_discover_existing.py --workspace brandlab --market MX
+   ```
+
+2. Audit the snapshot. If source content is available, use `paired_source`; if not, BrandLab uses `target_only` and reports the checks it cannot verify:
+
+   ```bash
+   python3 scripts/audit_existing_translations.py --workspace brandlab --market MX
+   ```
+
+3. After the user selects audit items, create a local correction job:
+
+   ```bash
+   python3 scripts/create_correction_job.py --workspace brandlab --market MX --ids ITEM_ID_1,ITEM_ID_2
+   ```
+
+   Use `--all-recommended` only when the user has agreed to process explicit recommendations. Use `--mode rewrite` for a `target_only` item when the user wants a rewrite.
+
+4. Reuse the standard translation, review, and approval workflow. A correction review shows the published text, source reference availability, audit mode, correction mode, and whether semantic validation is available.
+
+Market corrections do not yet write back with Shopify Translation API. Stop after approval or create a separate human-confirmed migration task.
    ```
 
 ## Validation policy

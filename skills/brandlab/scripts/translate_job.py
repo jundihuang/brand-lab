@@ -25,14 +25,22 @@ def render_prompt(manifest: dict, guidelines: list[dict], glossary: list[dict], 
         f"- {row['source_term']} → {row['target_term']} [{row['status']}]{' — ' + row['note'] if row.get('note') else ''}"
         for row in glossary
     ]
-    item_lines = [
-        f"- `{row['item_id']}` ({row['resource_type']}): {row['source_digest']}"
-        for row in worklist
-    ]
+    correction = manifest.get("job_type") == "market_translation_correction"
+    item_lines = []
+    for row in worklist:
+        issue_count = len(row.get("audit_issues", []))
+        item_lines.append(
+            f"- `{row['item_id']}` ({row['resource_type']}): mode={row.get('correction_mode', 'translation')}; "
+            f"audit_issues={issue_count}; digest={row['source_digest']}"
+        )
     return "\n".join([
-        "# Translation Prompt", "",
+        "# Market Translation Correction Prompt" if correction else "# Translation Prompt", "",
         f"- Job: `{manifest['job_id']}`", f"- Direction: {manifest['source_locale']} → {manifest['target_locale']}",
-        "", "## Brand instructions", "", "Translate exactly one field at a time. Preserve meaning, tone, HTML tags, placeholders, and regulated wording.",
+        f"- Workflow: `{manifest.get('correction_mode', 'translation')}`",
+        "", "## Brand instructions", "",
+        "Correct or rewrite exactly one field at a time. Use the published text and audit issues as context. Preserve source meaning only when a source reference is available; preserve tone, HTML tags, placeholders, and regulated wording."
+        if correction else
+        "Translate exactly one field at a time. Preserve meaning, tone, HTML tags, placeholders, and regulated wording.",
         "", "## Active guidelines", "", *(guideline_lines or ["- No active guideline matched; do not translate until a guideline is added."]),
         "", "## Glossary", "", *(glossary_lines or ["- No locale glossary entries."]),
         "", "## Items in this worklist", "", *item_lines, "",
@@ -55,12 +63,20 @@ def prepare_translation(workspace: Path, job_dir: Path, manifest: dict) -> tuple
         if job_item["status"] not in {"pending", "stale"}:
             continue
         source = read_json(job_dir / job_item["source_path"])
-        worklist.append({
+        row = {
             "item_id": job_item["item_id"], "source": source.get("source", ""),
             "source_digest": job_item["source_digest"], "source_locale": manifest["source_locale"],
             "target_locale": manifest["target_locale"], "resource_type": source.get("resource_type", ""),
             "guideline_ids": job_item.get("guideline_ids", []),
-        })
+        }
+        if manifest.get("job_type") == "market_translation_correction":
+            audit = source.get("audit", {})
+            row.update({
+                "published_text": source.get("published_text", ""), "source_available": source.get("source_available") is True,
+                "audit_mode": source.get("audit_mode"), "correction_mode": job_item.get("correction_mode", "fix"),
+                "audit_issues": audit.get("checks", []), "unverifiable_checks": audit.get("unverifiable_checks", []),
+            })
+        worklist.append(row)
     if not worklist:
         raise BrandLabError(f"{manifest['job_id']}: no pending or stale items. Run status.py or create a new job.")
     write_jsonl(job_dir / "worklist.jsonl", worklist)
@@ -138,6 +154,9 @@ def ingest_translations(workspace: Path, job_dir: Path, manifest: dict, input_pa
             "guideline_versions": {guideline["id"]: guideline.get("version") for guideline in item_guidelines},
             "glossary_digest": manifest.get("glossary_digest"), "checks": checks,
         }
+        if manifest.get("job_type") == "market_translation_correction":
+            audit["correction_mode"] = job_item.get("correction_mode")
+            audit["semantic_validation_available"] = manifest.get("semantic_validation_available") is True
         output = {
             "item_id": item_id, "translated_text": translated_text,
             "source_digest": source_digest, "source_locale": source_locale,

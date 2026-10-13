@@ -91,6 +91,31 @@ BrandLab 只会更新：
 
 每批最多更新 10 条。
 
+## 检查已有市场翻译
+
+如果一个市场已经有翻译，例如墨西哥市场，你可以对 Codex 说：
+
+```text
+检查 MX 市场的现有翻译，先不要修改 Shopify。
+```
+
+BrandLab 会生成翻译体检报告，告诉你：
+
+- 哪些内容可以直接保留
+- 哪些内容需要修复或重新翻译
+- 哪些内容只需要本地化调整
+- 哪些内容需要人工判断
+
+如果找不到英文源内容，BrandLab 会切换为“仅目标内容检查”。它仍然能检查语言质量、品牌规则、SEO、占位符和格式，但不会假装能判断“错译、漏译或多译”。
+
+你确认要处理后，可以说：
+
+```text
+把报告里需要重新翻译的商品标题创建成修复任务。
+```
+
+修复任务也会先生成审核文件；你批准前，它不会导出或修改 Shopify。
+
 ## 结果在哪里
 
 | 内容 | 位置 |
@@ -100,6 +125,9 @@ BrandLab 只会更新：
 | 人工审核文件 | `brandlab/jobs/<任务ID>/review.md` |
 | 导出文件 | `brandlab/exports/` |
 | Shopify 发现内容 | `brandlab/shopify/discovery/` |
+| 已有市场翻译 | `brandlab/shopify/existing-translations/` |
+| 翻译体检报告 | `brandlab/reports/` |
+| 修复计划 | `brandlab/corrections/` |
 | Shopify 回写计划 | `brandlab/shopify/mutation-plans/` |
 | 执行记录 | `brandlab/shopify/execution-results/` |
 | 操作历史 | `brandlab/history/events.jsonl` |
