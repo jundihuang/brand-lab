@@ -153,7 +153,7 @@ def load_history_references(workspace: Path, job_id: str | None) -> dict[tuple[s
 def snapshot_records(
     data: dict[str, Any], market_entry: dict[str, Any], source_locale: str, market_id: str,
     shopify_market_id: str | None, references: dict[tuple[str, str], dict[str, Any]] | None = None,
-    resource_filter: set[str] | None = None,
+    resource_filter: set[str] | None = None, shopify_locale_override: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     records: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -204,7 +204,7 @@ def snapshot_records(
                 'market': market_id,
                 'market_id': market_entry.get('id'),
                 'target_locale': market_entry['locale'],
-                'shopify_locale': market_entry.get('shopify_locale') or locale_base(market_entry['locale']),
+                'shopify_locale': shopify_locale_override or market_entry.get('shopify_locale') or locale_base(market_entry['locale']),
                 'resource_type': resource_type(resource_id),
                 'shopify_resource_id': resource_id,
                 'field_key': key,
@@ -265,6 +265,7 @@ def discover_existing(args: argparse.Namespace) -> None:
         data, market_entry, source_locale,
         str(market_entry.get('id') or market_entry['market']), args.shopify_market_id,
         references, set(args.resource_type) if args.resource_type else None,
+        shopify_locale_override=shopify_locale,
     )
     output_dir = workspace / 'shopify' / 'existing-translations'
     market_slug = slug(str(market_entry.get('id') or market_entry['market']))
