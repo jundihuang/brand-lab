@@ -27,6 +27,10 @@ SUPPORTED_RESOURCE_TYPES = {
     "care_and_compliance",
 }
 ACTIONABLE_CATALOG_STATUSES = {"new", "changed", "unchanged", "pending"}
+SOURCE_STRATEGIES = {"base", "bridge", "existing_translation"}
+TRANSLATION_MODES = {"translation", "localization_only", "manual_only"}
+AUDIT_POLICIES = {"standard", "seo_and_legal", "custom"}
+AUDIT_MODES = {"auto", "paired_source", "target_only"}
 JOB_ITEM_STATUSES = {
     "pending", "translated", "needs_review", "approved", "rejected",
     "blocked", "exported", "stale",
@@ -148,22 +152,95 @@ def append_history(workspace: Path, event_type: str, payload: dict[str, Any]) ->
         handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
 
 
+def normalize_market_registry(brand: dict[str, Any], config_path: Path) -> dict[str, Any]:
+    """Apply v0.3 market defaults while retaining compatibility with v0.2 files."""
+    source = brand.get("source")
+    if source is not None and not isinstance(source, dict):
+        raise BrandLabError(f"{config_path}: source must be a mapping with default_locale.")
+    if isinstance(source, dict) and not str(source.get("default_locale", "")).strip():
+        raise BrandLabError(f"{config_path}: source.default_locale cannot be empty.")
+    if not isinstance(brand.get("markets"), list):
+        raise BrandLabError(f"{config_path}: markets must be a list.")
+
+    seen_ids: set[str] = set()
+    seen_locales: set[str] = set()
+    normalized: list[dict[str, Any]] = []
+    source_language = str(brand.get("source_language") or "")
+    for index, raw in enumerate(brand["markets"]):
+        label = f"markets[{index}]"
+        if not isinstance(raw, dict) or not {"market", "locale", "enabled"}.issubset(raw):
+            raise BrandLabError(f"{config_path}: {label} needs market, locale, and enabled.")
+        market = str(raw["market"]).strip()
+        locale = str(raw["locale"]).strip()
+        if not market or not locale:
+            raise BrandLabError(f"{config_path}: {label} market and locale cannot be empty.")
+        market_id = str(raw.get("id") or market).strip()
+        if market_id in seen_ids:
+            raise BrandLabError(f"{config_path}: {label} id '{market_id}' is duplicated. Use a unique market id.")
+        locale_key = locale.casefold()
+        if locale_key in seen_locales:
+            raise BrandLabError(f"{config_path}: {label} locale '{locale}' is duplicated. Markets must use unique BrandLab locales.")
+        seen_ids.add(market_id)
+        seen_locales.add(locale_key)
+
+        shopify_locale = str(raw.get("shopify_locale") or locale_base(locale)).strip()
+        source_strategy = str(raw.get("source_strategy") or "base")
+        translation_mode = str(raw.get("translation_mode") or "translation")
+        review_required = raw.get("review_required", True)
+        audit_policy = str(raw.get("audit_policy") or "standard")
+        audit_mode = str(raw.get("audit_mode") or "auto")
+        if source_strategy not in SOURCE_STRATEGIES:
+            raise BrandLabError(f"{config_path}: {label}.source_strategy must be one of {sorted(SOURCE_STRATEGIES)}.")
+        if translation_mode not in TRANSLATION_MODES:
+            raise BrandLabError(f"{config_path}: {label}.translation_mode must be one of {sorted(TRANSLATION_MODES)}.")
+        if audit_policy not in AUDIT_POLICIES:
+            raise BrandLabError(f"{config_path}: {label}.audit_policy must be one of {sorted(AUDIT_POLICIES)}.")
+        if audit_mode not in AUDIT_MODES:
+            raise BrandLabError(f"{config_path}: {label}.audit_mode must be one of {sorted(AUDIT_MODES)}.")
+        if not isinstance(review_required, bool):
+            raise BrandLabError(f"{config_path}: {label}.review_required must be true or false.")
+
+        entry = dict(raw)
+        entry.update({
+            "id": market_id,
+            "market": market,
+            "locale": locale,
+            "shopify_locale": shopify_locale,
+            "enabled": raw["enabled"] is True,
+            "source_strategy": source_strategy,
+            "translation_mode": translation_mode,
+            "review_required": review_required,
+            "audit_policy": audit_policy,
+            "audit_mode": audit_mode,
+        })
+        if translation_mode == "translation" and source_language and locale_base(locale) == locale_base(source_language):
+            entry["translation_mode"] = "localization_only"
+        normalized.append(entry)
+    brand["markets"] = normalized
+    return brand
+
+
 def load_brand(workspace: Path) -> dict[str, Any]:
-    brand = load_yaml(workspace / "brand.yaml")
+    config_path = workspace / "brand.yaml"
+    brand = load_yaml(config_path)
     if not isinstance(brand, dict):
-        raise BrandLabError(f"{workspace / 'brand.yaml'}: top level must be a mapping.")
+        raise BrandLabError(f"{config_path}: top level must be a mapping.")
     required = ("brand", "mode", "source_language", "working_language", "markets")
     missing = [field for field in required if field not in brand]
     if missing:
-        raise BrandLabError(f"{workspace / 'brand.yaml'}: missing fields {missing}. Add them and retry.")
+        raise BrandLabError(f"{config_path}: missing fields {missing}. Add them and retry.")
     if brand["mode"] not in SUPPORTED_MODES:
-        raise BrandLabError(f"{workspace / 'brand.yaml'}: mode must be one of {sorted(SUPPORTED_MODES)}.")
-    if not isinstance(brand["markets"], list):
-        raise BrandLabError(f"{workspace / 'brand.yaml'}: markets must be a list.")
-    for index, market in enumerate(brand["markets"]):
-        if not isinstance(market, dict) or not {"market", "locale", "enabled"}.issubset(market):
-            raise BrandLabError(f"{workspace / 'brand.yaml'}: markets[{index}] needs market, locale, and enabled.")
-    return brand
+        raise BrandLabError(f"{config_path}: mode must be one of {sorted(SUPPORTED_MODES)}.")
+    return normalize_market_registry(brand, config_path)
+
+
+def find_market(brand: dict[str, Any], market_id: str) -> dict[str, Any]:
+    wanted = market_id.strip().casefold()
+    for market in brand.get("markets", []):
+        if str(market.get("id", "")).casefold() == wanted or str(market.get("market", "")).casefold() == wanted:
+            return market
+    known = ", ".join(str(item.get("id") or item.get("market")) for item in brand.get("markets", []))
+    raise BrandLabError(f"market '{market_id}': not found in brand.yaml. Configured markets are {known}.")
 
 
 def locale_base(locale: str) -> str:

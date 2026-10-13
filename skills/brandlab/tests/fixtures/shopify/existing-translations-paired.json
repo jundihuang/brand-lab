@@ -1,0 +1,67 @@
+{
+  "data": {
+    "shop": {"primaryLocale": {"isoCode": "en", "name": "English"}},
+    "translatableResources": {
+      "nodes": [
+        {
+          "resourceId": "gid://shopify/Product/123",
+          "translatableContent": [
+            {"key": "title", "value": "Leopard mini skirt", "digest": "digest-title", "locale": "en"},
+            {"key": "description_html", "value": "<p>Leopard mini skirt</p>", "digest": "digest-body", "locale": "en"}
+          ],
+          "translations": [
+            {"key": "title", "value": "Minigonna leopardo", "marketId": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"},
+            {"key": "description_html", "value": "<p>Minigonna leopardo</p>", "marketId": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"}
+          ]
+        },
+        {
+          "resourceId": "gid://shopify/Product/456",
+          "translatableContent": [
+            {"key": "title", "value": "Silk dress", "digest": "digest-silk", "locale": "en"}
+          ],
+          "translations": [
+            {"key": "title", "value": "Silk dress", "marketId": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"}
+          ]
+        },
+        {
+          "resourceId": "gid://shopify/Product/789",
+          "translatableContent": [
+            {"key": "seo_title", "value": "Silk dress | Miss Sixty", "digest": "digest-seo-title", "locale": "en"},
+            {"key": "seo_description", "value": "Shop the silk dress.", "digest": "digest-seo-description", "locale": "en"}
+          ],
+          "translations": [
+            {"key": "seo_title", "value": "Vestido de seda | Miss Sixty", "marketId": null, "outdated": false},
+            {"key": "seo_description", "value": "Compra el vestido de seda.", "marketId": null, "outdated": false}
+          ]
+        },
+        {
+          "resourceId": "gid://shopify/Collection/101",
+          "translatableContent": [
+            {"key": "title", "value": "Mini skirts", "digest": "digest-collection-title", "locale": "en"}
+          ],
+          "translations": [
+            {"key": "title", "value": "Minigonne", "marketId": null, "outdated": false}
+          ]
+        },
+        {
+          "resourceId": "gid://shopify/Page/102",
+          "translatableContent": [
+            {"key": "title", "value": "Size guide", "digest": "digest-page-title", "locale": "en"}
+          ],
+          "translations": [
+            {"key": "title", "value": "Guida alle taglie", "marketId": null, "outdated": false}
+          ]
+        },
+        {
+          "resourceId": "gid://shopify/Blog/103",
+          "translatableContent": [
+            {"key": "title", "value": "Style journal", "digest": "digest-blog-title", "locale": "en"}
+          ],
+          "translations": [
+            {"key": "title", "value": "Diario di stile", "marketId": null, "outdated": false}
+          ]
+        }
+      ]
+    }
+  }
+}

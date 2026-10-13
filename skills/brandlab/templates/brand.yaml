@@ -1,10 +1,19 @@
 brand: BRAND_NAME
 mode: pure
 source_language: en
+source:
+  default_locale: en
 working_language: zh-CN
 default_tone: premium, confident, minimal
 
 markets:
-  - market: IT
+  - id: IT
+    market: IT
     locale: it-IT
+    shopify_locale: it
     enabled: true
+    source_strategy: base
+    translation_mode: translation
+    review_required: true
+    audit_policy: standard
+    audit_mode: auto

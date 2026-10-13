@@ -1,0 +1,18 @@
+{
+  "data": {
+    "shop": {"primaryLocale": {"isoCode": "es", "name": "Spanish"}},
+    "translatableResources": {
+      "nodes": [
+        {
+          "resourceId": "gid://shopify/Product/789",
+          "translatableContent": [
+            {"key": "title", "value": "Vestido de seda", "digest": "digest-mx-title", "locale": "es"}
+          ],
+          "translations": [
+            {"key": "title", "value": "Vestido de seda premium", "marketId": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"}
+          ]
+        }
+      ]
+    }
+  }
+}
