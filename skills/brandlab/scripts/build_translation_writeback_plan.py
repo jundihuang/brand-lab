@@ -22,7 +22,7 @@ QUERY = '''mutation BrandLabTranslationRegister($resourceId: ID!, $translations:
       key
       value
       locale
-      marketId
+      market { id }
     }
     userErrors {
       field
@@ -131,7 +131,7 @@ def build_plan(args: argparse.Namespace) -> None:
         alias = aliases_by_resource[variables[var]["resourceId"]]
         operation_lines.append(
             f"    {alias}: translationsRegister(resourceId: ${var}, translations: ${var}_translations) "
-            "{ translations { key value locale marketId } userErrors { field message } }"
+            "{ translations { key value locale market { id } } userErrors { field message } }"
         )
         definitions.append(f"${var}_translations: [TranslationInput!]!")
     query = "mutation BrandLabTranslationRegister(" + ", ".join(definitions) + ") {\n" + "\n".join(operation_lines) + "\n}"

@@ -10,8 +10,8 @@
             {"key": "description_html", "value": "<p>Leopard mini skirt</p>", "digest": "digest-body", "locale": "en"}
           ],
           "translations": [
-            {"key": "title", "value": "Minigonna leopardo", "marketId": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"},
-            {"key": "description_html", "value": "<p>Minigonna leopardo</p>", "marketId": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"}
+            {"key": "title", "value": "Minigonna leopardo", "market": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"},
+            {"key": "description_html", "value": "<p>Minigonna leopardo</p>", "market": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"}
           ]
         },
         {
@@ -20,7 +20,7 @@
             {"key": "title", "value": "Silk dress", "digest": "digest-silk", "locale": "en"}
           ],
           "translations": [
-            {"key": "title", "value": "Silk dress", "marketId": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"}
+            {"key": "title", "value": "Silk dress", "market": null, "outdated": false, "updatedAt": "2026-10-01T00:00:00Z"}
           ]
         },
         {
@@ -30,8 +30,8 @@
             {"key": "seo_description", "value": "Shop the silk dress.", "digest": "digest-seo-description", "locale": "en"}
           ],
           "translations": [
-            {"key": "seo_title", "value": "Vestido de seda | Miss Sixty", "marketId": null, "outdated": false},
-            {"key": "seo_description", "value": "Compra el vestido de seda.", "marketId": null, "outdated": false}
+            {"key": "seo_title", "value": "Vestido de seda | Miss Sixty", "market": null, "outdated": false},
+            {"key": "seo_description", "value": "Compra el vestido de seda.", "market": null, "outdated": false}
           ]
         },
         {
@@ -40,7 +40,7 @@
             {"key": "title", "value": "Mini skirts", "digest": "digest-collection-title", "locale": "en"}
           ],
           "translations": [
-            {"key": "title", "value": "Minigonne", "marketId": null, "outdated": false}
+            {"key": "title", "value": "Minigonne", "market": null, "outdated": false}
           ]
         },
         {
@@ -49,7 +49,7 @@
             {"key": "title", "value": "Size guide", "digest": "digest-page-title", "locale": "en"}
           ],
           "translations": [
-            {"key": "title", "value": "Guida alle taglie", "marketId": null, "outdated": false}
+            {"key": "title", "value": "Guida alle taglie", "market": null, "outdated": false}
           ]
         },
         {
@@ -58,7 +58,7 @@
             {"key": "title", "value": "Style journal", "digest": "digest-blog-title", "locale": "en"}
           ],
           "translations": [
-            {"key": "title", "value": "Diario di stile", "marketId": null, "outdated": false}
+            {"key": "title", "value": "Diario di stile", "market": null, "outdated": false}
           ]
         }
       ]

@@ -1,7 +1,7 @@
 {
   "data": {
     "operation_0": {
-      "translations": [{"key": "title", "value": "Minigonna di seta", "locale": "it", "marketId": "gid://shopify/Market/US"}],
+      "translations": [{"key": "title", "value": "Minigonna di seta", "locale": "it", "market": {"id": "gid://shopify/Market/US"}}],
       "userErrors": []
     }
   }

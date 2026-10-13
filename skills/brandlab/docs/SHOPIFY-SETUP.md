@@ -109,6 +109,7 @@ Existing market translation corrections use Shopify Translation API. The app or 
 ```text
 read_translations
 write_translations
+read_locales
 ```
 
 After a correction job is approved:

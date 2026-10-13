@@ -3,7 +3,7 @@
     "translatableResourcesByIds": {
       "nodes": [{
         "resourceId": "gid://shopify/Product/456",
-        "translations": [{"key": "title", "value": "Minigonna di seta", "marketId": "gid://shopify/Market/US"}]
+        "translations": [{"key": "title", "value": "Minigonna di seta", "market": {"id": "gid://shopify/Market/US"}}]
       }]
     }
   }

@@ -17,7 +17,7 @@ query {
     translations(locale: "es") {
       key
       value
-      marketId
+      market { id }
       outdated
       updatedAt
     }
@@ -29,9 +29,10 @@ Key rules:
 
 1. `translatableContent.digest` is required by `translationsRegister`.
 2. `translations` can include unpublished locales.
-3. `marketId: null` means the translation is not scoped to one market.
+3. `market: null` means the translation is not scoped to one market.
 4. `outdated: true` means source content changed after translation.
 5. Match resources by Shopify resource ID and field key. Do not infer a market from locale alone.
+6. `Shop.primaryLocale` was removed from the API; use root-level `shopLocales` to find the primary locale.
 
 ## Write model
 
@@ -44,7 +45,7 @@ mutation translationsRegister($resourceId: ID!, $translations: [TranslationInput
       key
       value
       locale
-      marketId
+      market { id }
     }
     userErrors {
       field
@@ -69,9 +70,11 @@ Minimum scopes:
 ```text
 read_translations
 write_translations
+read_locales
 ```
 
 Market discovery uses `read_markets`. Market mutation is not part of BrandLab v0.3.
+`read_locales` is required for the root-level `shopLocales` query.
 
 ## BrandLab safety rules
 
@@ -95,4 +98,10 @@ Fixture-covered:
 5. `translationsRegister` execution
 6. read-back verification
 
-Live test-store smoke test is still required before customer writeback rollout.
+Live validated on `jayce-plus-store` (read-only, 2026-10-13):
+
+1. `shopLocales` returns published locales (en primary, it published).
+2. `translatableResources(resourceType: PRODUCT)` returns source content with correct `digest`.
+3. `translations(locale: "it")` returns published Italian translations.
+4. Existing translation audit detected one mismatched translation (source content differs from published translation).
+5. Writeback mutation has not been live-tested yet.

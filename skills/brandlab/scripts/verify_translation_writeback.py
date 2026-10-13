@@ -22,7 +22,7 @@ QUERY = '''query VerifyTranslationWriteback($resourceIds: [ID!], $locale: String
       translations(locale: $locale) {
         key
         value
-        marketId
+        market { id }
       }
     }
   }
@@ -57,7 +57,9 @@ def verify(args: argparse.Namespace) -> None:
         translations = node.get("translations", []) if isinstance(node, dict) else []
         match = next((row for row in translations if row.get("key") == item["field"]), None)
         value_match = bool(match) and match.get("value") == item["after"]
-        market_match = True if item.get("shopify_market_id") is None else match is not None and match.get("marketId") == item["shopify_market_id"]
+        _match_market = (match.get("market") if isinstance(match, dict) else None)
+        _match_market_id = _match_market.get("id") if isinstance(_match_market, dict) else None
+        market_match = True if item.get("shopify_market_id") is None else match is not None and _match_market_id == item["shopify_market_id"]
         item["readback"] = match.get("value") if match else None
         item["status"] = "verified" if value_match and market_match else "mismatched"
     statuses = [item["status"] for item in result["items"]]
