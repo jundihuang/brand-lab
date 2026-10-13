@@ -15,6 +15,14 @@ class CorrectionJobTest(ShopifyModeTestCase):
         return json.loads((workspace / "reports/existing-translation-audit-it.json").read_text())
 
     def prepare_approved_correction(self, workspace: Path, job_id: str, item_id: str, text: str) -> None:
+        self.prepare_correction_output(workspace, job_id, item_id, text)
+        self.run_cli("build_review.py", "--workspace", str(workspace), "--job", job_id)
+        self.run_cli(
+            "apply_approval.py", "--workspace", str(workspace), "--job", job_id,
+            "--decision", "approve", "--item-id", "all", "--reviewer", "Jayce",
+        )
+
+    def prepare_correction_output(self, workspace: Path, job_id: str, item_id: str, text: str) -> None:
         self.run_cli("translate_job.py", "--workspace", str(workspace), "--job", job_id)
         snapshot = json.loads((workspace / "jobs" / job_id / "sources" / f"{item_id}.json").read_text())
         output = [{
@@ -25,11 +33,38 @@ class CorrectionJobTest(ShopifyModeTestCase):
             "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in output), encoding="utf-8"
         )
         self.run_cli("translate_job.py", "--workspace", str(workspace), "--job", job_id, "--input", "model-translations.jsonl")
-        self.run_cli("build_review.py", "--workspace", str(workspace), "--job", job_id)
+
+    def test_rejected_correction_returns_to_audit_state(self) -> None:
+        workspace = self.temp_workspace()
+        self.init_shopify(workspace)
+        report = self.audit_market(workspace, "existing-translations-paired.json")
+        item = next(row for row in report["items"] if row["recommendation"] == "retranslate")
         self.run_cli(
-            "apply_approval.py", "--workspace", str(workspace), "--job", job_id,
-            "--decision", "approve", "--item-id", "all", "--reviewer", "Jayce",
+            "create_correction_job.py", "--workspace", str(workspace), "--market", "IT",
+            "--ids", item["item_id"], "--job-id", "correction-rejected",
         )
+        report_path = workspace / "reports/existing-translation-audit-it.json"
+        report = json.loads(report_path.read_text())
+        audit_item = next(row for row in report["items"] if row["item_id"] == item["item_id"])
+        self.assertEqual(audit_item["correction_status"], "pending")
+        self.assertEqual(audit_item["correction_job_id"], "correction-rejected")
+
+        self.prepare_correction_output(workspace, "correction-rejected", item["item_id"], "Bad translation")
+        self.run_cli("build_review.py", "--workspace", str(workspace), "--job", "correction-rejected")
+        self.run_cli(
+            "apply_approval.py", "--workspace", str(workspace), "--job", "correction-rejected",
+            "--decision", "reject", "--item-id", item["item_id"], "--reviewer", "Jayce",
+            "--note", "Wrong material",
+        )
+        rejected_report = json.loads(report_path.read_text())
+        rejected_item = next(row for row in rejected_report["items"] if row["item_id"] == item["item_id"])
+        job = json.loads((workspace / "jobs/correction-rejected/manifest.json").read_text())
+        self.assertEqual(rejected_item["correction_status"], "rejected")
+        self.assertEqual(rejected_item["correction_reviewer"], "Jayce")
+        self.assertEqual(job["items"][0]["status"], "rejected")
+        self.assertEqual(job["status"], "review")
+        events = [json.loads(line) for line in (workspace / "history/events.jsonl").read_text().splitlines()]
+        self.assertIn("correction_audit_state_updated", [event["event_type"] for event in events])
 
     def test_paired_retranslation_goes_through_review_and_approval(self) -> None:
         workspace = self.temp_workspace()

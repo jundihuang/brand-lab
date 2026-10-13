@@ -55,6 +55,23 @@ def correction_mode(item: dict[str, Any], requested: str) -> str:
     return mode
 
 
+def mark_audit_items(report_path: Path, selected: list[dict[str, Any]], job_id: str, mode: str) -> None:
+    report = read_json(report_path)
+    by_id = {item.get("item_id"): item for item in report.get("items", [])}
+    now = utc_now()
+    for item in selected:
+        audit_item = by_id.get(item.get("item_id"))
+        if audit_item is None:
+            raise BrandLabError(
+                f"{report_path}: audit item {item.get('item_id')} disappeared while creating the correction job."
+            )
+        audit_item["correction_status"] = "pending"
+        audit_item["correction_job_id"] = job_id
+        audit_item["correction_mode"] = mode
+        audit_item["correction_updated_at"] = now
+    atomic_write_json(report_path, report)
+
+
 def load_audit_report(workspace: Path, market: str | None, audit: str | None) -> tuple[dict[str, Any], Path]:
     if audit:
         report_path = Path(audit).expanduser().resolve()
@@ -195,6 +212,11 @@ def create_job(args: argparse.Namespace) -> None:
         "items": job_items,
     }
     save_job(job_dir, manifest)
+    mark_audit_items(report_path, selected, job_id, correction_mode_value)
+    append_history(workspace, "correction_audit_state_updated", {
+        "job_id": job_id, "audit_id": report.get("audit_id"), "status": "pending",
+        "items": [item["item_id"] for item in selected],
+    })
 
     plan_lines = [
         "# Market Translation Correction Plan", "",

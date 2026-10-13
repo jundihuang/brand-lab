@@ -13,6 +13,9 @@ from brandlab_lib import (
 
 
 DECISIONS = {"approve": "approved", "reject": "rejected", "request_changes": "needs_review"}
+CORRECTION_REPORT_STATUS = {
+    "approve": "approved", "reject": "rejected", "request_changes": "needs_review",
+}
 
 
 def eligible_for_approval(job_item: dict, audit: dict) -> tuple[bool, str]:
@@ -25,6 +28,27 @@ def eligible_for_approval(job_item: dict, audit: dict) -> tuple[bool, str]:
     if hard_failures:
         return False, f"{len(hard_failures)} hard-rule failure(s)"
     return True, "eligible"
+
+
+def update_correction_audit_state(workspace: Path, manifest: dict, targets: list[dict], decision: str, reviewer: str) -> None:
+    if manifest.get("job_type") != "market_translation_correction":
+        return
+    report_value = manifest.get("audit_report")
+    if not report_value:
+        raise BrandLabError("correction audit state: job manifest is missing audit_report.")
+    report_path = workspace / str(report_value)
+    report = read_json(report_path)
+    by_id = {item.get("item_id"): item for item in report.get("items", [])}
+    now = utc_now()
+    for target in targets:
+        audit_item = by_id.get(target["item_id"])
+        if audit_item is None:
+            raise BrandLabError(f"{report_path}: audit item {target['item_id']} is missing from the correction audit report.")
+        audit_item["correction_status"] = CORRECTION_REPORT_STATUS[decision]
+        audit_item["correction_job_id"] = manifest["job_id"]
+        audit_item["correction_updated_at"] = now
+        audit_item["correction_reviewer"] = reviewer
+    atomic_write_json(report_path, report)
 
 
 def apply(args: argparse.Namespace) -> None:
@@ -101,9 +125,11 @@ def apply(args: argparse.Namespace) -> None:
     else:
         manifest["status"] = "review"
     save_job(job_dir, manifest)
+    update_correction_audit_state(workspace, manifest, targets, args.decision, args.reviewer)
     append_history(workspace, "approval_applied", {
         "job_id": args.job, "decision": args.decision, "reviewer": args.reviewer,
         "items": [item["item_id"] for item in targets],
+        "audit_state_updated": manifest.get("job_type") == "market_translation_correction",
     })
     print(json.dumps({
         "result": "ok", "job_id": args.job, "decision": args.decision,
@@ -113,7 +139,10 @@ def apply(args: argparse.Namespace) -> None:
     if requested_all:
         for item_id, reason in skipped:
             print(f"Skipped {item_id}: {reason}", file=sys.stderr)
-    print("Next: if ready, run build_export.py to export approved items only.")
+    if args.decision == "approve":
+        print("Next: if ready, run build_export.py to export approved items only.")
+    else:
+        print("Next: the item remains in the audit report with its correction status; do not export it.")
 
 
 def build_parser() -> argparse.ArgumentParser:

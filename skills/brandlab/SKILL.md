@@ -153,6 +153,8 @@ Use this workflow when a market such as MX or IT already has translations. Disco
 
 5. Reuse the standard translation, review, and approval workflow. A correction review shows the published text, source reference availability, audit mode, correction mode, and whether semantic validation is available.
 
+   Rejected or needs-review corrections stay non-exportable and are marked in the audit report. Create a new correction only after the user provides revised instructions or a source reference.
+
 After translation approval, market corrections can use Shopify Translation API writeback:
 
 ```bash
