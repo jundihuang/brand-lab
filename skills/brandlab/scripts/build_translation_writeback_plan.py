@@ -69,8 +69,8 @@ def build_plan(args: argparse.Namespace) -> None:
         if item.get("status") != "approved":
             rejected.append((item["item_id"], f"job status {item.get('status')}"))
             continue
-        digest = item.get("translatable_content_digest") or item.get("source_digest")
-        if not digest or not str(digest).strip():
+        digest = str(item.get("translatable_content_digest") or "").strip()
+        if not digest:
             rejected.append((item["item_id"], "missing Shopify translatable content digest"))
             continue
         selected.append(item)
@@ -94,7 +94,10 @@ def build_plan(args: argparse.Namespace) -> None:
         if not resource_id.startswith("gid://shopify/"):
             rejected.append((item["item_id"], "invalid Shopify resource ID"))
             continue
-        digest = str(item.get("translatable_content_digest") or item.get("source_digest"))
+        digest = str(item.get("translatable_content_digest") or "").strip()
+        if not digest:
+            rejected.append((item["item_id"], "missing Shopify translatable content digest"))
+            continue
         translation = {
             "key": str(snapshot.get("field_key") or ""),
             "locale": shopify_locale,

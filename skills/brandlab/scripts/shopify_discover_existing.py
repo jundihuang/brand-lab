@@ -207,6 +207,7 @@ def snapshot_records(
                 'source_text': source_text,
                 'source_digest': source_digest,
                 'source_reference_digest': external_digest,
+                'translatable_content_digest': value_text(content.get('digest')) or None,
                 'published_locale': market_entry['locale'],
                 'published_text': published,
                 'published_digest': value_text(translation.get('digest')) if translation and translation.get('digest') else None,

@@ -147,3 +147,27 @@ class CorrectionJobTest(ShopifyModeTestCase):
         self.assertEqual(approved["status"], "approved")
         audit = json.loads((workspace / "jobs/correction-rewrite/audits" / f"{item['item_id']}.audit.json").read_text())
         self.assertFalse(audit["semantic_validation_available"])
+
+    def test_target_only_rewrite_keeps_shopify_translatable_content_digest(self) -> None:
+        workspace = self.temp_workspace()
+        self.init_shopify(workspace)
+        report = self.audit_market(workspace, "existing-translations-target-only.json")
+        item = report["items"][0]
+        self.run_cli(
+            "create_correction_job.py", "--workspace", str(workspace), "--market", "IT",
+            "--ids", item["item_id"], "--mode", "rewrite", "--job-id", "rewrite-writeback",
+        )
+        manifest = json.loads((workspace / "jobs/rewrite-writeback/manifest.json").read_text())
+        snapshot = json.loads((workspace / "jobs/rewrite-writeback/sources" / f"{item['item_id']}.json").read_text())
+        self.assertEqual(manifest["items"][0]["translatable_content_digest"], "digest-mx-title")
+        self.assertEqual(snapshot["translatable_content_digest"], "digest-mx-title")
+        self.assertTrue(snapshot["source_digest"].startswith("sha256:"))
+        self.prepare_approved_correction(workspace, "rewrite-writeback", item["item_id"], "Vestido corregido")
+        self.run_cli(
+            "build_translation_writeback_plan.py", "--workspace", str(workspace), "--job", "rewrite-writeback",
+            "--batch-id", "rewrite-batch", "--shopify-market-id", "gid://shopify/Market/MX",
+            "--provider", "fixture", "--fixture", str(FIXTURES / "setup-ok.json"),
+        )
+        plan = json.loads((workspace / "shopify/translation-writeback-plans/rewrite-batch.json").read_text())
+        self.assertEqual(plan["operations"][0]["translatable_content_digest"], "digest-mx-title")
+        self.assertEqual(plan["operations"][0]["shopify_market_id"], "gid://shopify/Market/MX")
