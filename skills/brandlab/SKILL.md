@@ -145,7 +145,17 @@ Use this workflow when a market such as MX or IT already has translations. Disco
 
 4. Reuse the standard translation, review, and approval workflow. A correction review shows the published text, source reference availability, audit mode, correction mode, and whether semantic validation is available.
 
-Market corrections do not yet write back with Shopify Translation API. Stop after approval or create a separate human-confirmed migration task.
+After translation approval, market corrections can use Shopify Translation API writeback:
+
+```bash
+python3 scripts/build_translation_writeback_plan.py --workspace brandlab --job JOB_ID
+python3 scripts/approve_mutation_plan.py --workspace brandlab --plan brandlab/shopify/translation-writeback-plans/PLAN.json --reviewer "Reviewer"
+python3 scripts/execute_translation_writeback.py --workspace brandlab --plan brandlab/shopify/translation-writeback-plans/PLAN.json
+python3 scripts/execute_translation_writeback.py --workspace brandlab --plan brandlab/shopify/translation-writeback-plans/PLAN.json --execute
+python3 scripts/verify_translation_writeback.py --workspace brandlab --result brandlab/shopify/translation-writeback-results/RESULT.json
+```
+
+Never bypass the separate writeback approval and `--execute` gate.
 
 ## Market onboarding
 

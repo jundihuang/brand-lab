@@ -1,0 +1,8 @@
+{
+  "data": {
+    "translatableResource": {
+      "resourceId": "gid://shopify/Product/456",
+      "translatableContent": [{"key": "title", "digest": "digest-silk"}]
+    }
+  }
+}

@@ -163,6 +163,7 @@ def create_job(args: argparse.Namespace) -> None:
             "shopify_resource_id": item.get("shopify_resource_id", ""), "field_key": item.get("field_key", ""),
             "source_available": source_available, "audit_mode": item.get("audit_mode"),
             "source_locale": source_locale, "source_digest": reference_digest,
+            "translatable_content_digest": item.get("translatable_content_digest"),
             "published_digest": item.get("published_digest"), "target_locale": target_locale,
             "audit": {
                 "audit_id": report.get("audit_id"), "status": item.get("status"),
@@ -175,6 +176,7 @@ def create_job(args: argparse.Namespace) -> None:
         atomic_write_json(snapshot_path, snapshot)
         job_items.append({
             "item_id": item_id, "status": "pending", "source_digest": reference_digest,
+            "translatable_content_digest": item.get("translatable_content_digest"),
             "guideline_ids": guideline_ids, "source_path": str(Path("sources") / f"{item_id}.json"),
             "translation_path": str(Path("translations") / f"{item_id}.json"),
             "audit_path": str(Path("audits") / f"{item_id}.audit.json"),

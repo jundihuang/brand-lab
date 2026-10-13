@@ -90,7 +90,10 @@ class ShopifyConnector:
             unknown_roots = set(re.findall(r"\b(productDelete|collectionDelete|pageDelete|blogDelete)\b", text, flags=re.I))
             if unknown_roots:
                 raise BrandLabError(f"GraphQL mutation: destructive operations are blocked in MVP: {sorted(unknown_roots)}.")
-            root_names = set(re.findall(r"\b(productCreate|productUpdate|collectionUpdate|pageUpdate|blogUpdate)\b", text, flags=re.I))
+            root_names = set(re.findall(
+                r"\b(productCreate|productUpdate|collectionUpdate|pageUpdate|blogUpdate|translationsRegister)\b",
+                text, flags=re.I,
+            ))
             if not root_names:
                 raise BrandLabError("GraphQL mutation: no supported mutation root found. Use a supported Shopify Admin mutation.")
             if "userErrors" not in text and "usererrors" not in text.casefold():

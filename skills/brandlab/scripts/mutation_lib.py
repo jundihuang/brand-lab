@@ -14,6 +14,7 @@ PRODUCT_FIELD_MAP = {
     "seo_title": "seo.title",
     "seo_description": "seo.description",
 }
+TRANSLATION_PLAN_TYPE = "translation_register"
 
 
 def canonical_digest(value: Any) -> str:
@@ -30,8 +31,8 @@ def approval_digest(approval_state: dict[str, Any], item_id: str) -> str:
     latest = decisions[-1]
     if latest.get("decision") != "approve" or latest.get("recorded_status") != "approved":
         raise BrandLabError(f"approval: item {item_id} latest decision is not approved.")
-    if latest.get("source_digest") and not str(latest["source_digest"]).startswith("sha256:"):
-        raise BrandLabError(f"approval: item {item_id} has an invalid source digest.")
+    if not latest.get("source_digest"):
+        raise BrandLabError(f"approval: item {item_id} has no source digest.")
     return canonical_digest(decisions)
 
 
@@ -45,6 +46,8 @@ def load_plan(path: Path) -> dict[str, Any]:
         raise BrandLabError(f"{path}: mutation plan is missing {missing}.")
     if plan["mode"] != "shopify_controlled":
         raise BrandLabError(f"{path}: plan mode must be shopify_controlled.")
+    if plan.get("plan_type") not in {None, TRANSLATION_PLAN_TYPE, "product_update"}:
+        raise BrandLabError(f"{path}: unsupported plan type {plan.get('plan_type')}.")
     if int(plan["max_batch_size"]) > 10:
         raise BrandLabError(f"{path}: max_batch_size cannot exceed 10.")
     if len(plan["operations"]) > int(plan["max_batch_size"]):

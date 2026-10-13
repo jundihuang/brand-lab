@@ -55,7 +55,7 @@ brandlab/exports/
 
 ## Shopify 回写
 
-BrandLab 可以读取 Shopify 商品内容，并把批准后的翻译写回商品。
+BrandLab 可以读取 Shopify 商品内容，并把批准后的翻译写回商品。已有市场翻译修复会使用 Shopify Translation API，按市场和语言写入，不会覆盖商品默认字段。
 
 你可以说：
 
@@ -81,6 +81,7 @@ BrandLab 只会更新：
 - 商品描述
 - SEO 标题
 - SEO 描述
+- 市场翻译内容，使用 Shopify Translation API
 
 它不会：
 

@@ -71,7 +71,7 @@ python3 scripts/apply_approval.py --workspace brandlab --job JOB_ID --decision a
 
 ## Controlled writes
 
-Mode 3 currently writes only Product fields:
+Legacy product discovery can update default Product fields:
 
 - `title`
 - `descriptionHtml`
@@ -101,6 +101,27 @@ python3 scripts/verify_execution.py --workspace brandlab --result brandlab/shopi
 The command without `--execute` is a preflight. `--execute` is intentionally separate from plan approval. Each plan contains at most 10 approved items. Failed batches stop and are never retried automatically.
 
 Raw CLI output is saved under `brandlab/shopify/connector-output/`, and command metadata is appended to `brandlab/shopify/command-log.jsonl`.
+
+## Market translation writeback
+
+Existing market translation corrections use Shopify Translation API. The app or CLI connection needs:
+
+```text
+read_translations
+write_translations
+```
+
+After a correction job is approved:
+
+```bash
+python3 scripts/build_translation_writeback_plan.py --workspace brandlab --job JOB_ID
+python3 scripts/approve_mutation_plan.py --workspace brandlab --plan brandlab/shopify/translation-writeback-plans/PLAN.json --reviewer "Your Name"
+python3 scripts/execute_translation_writeback.py --workspace brandlab --plan brandlab/shopify/translation-writeback-plans/PLAN.json
+python3 scripts/execute_translation_writeback.py --workspace brandlab --plan brandlab/shopify/translation-writeback-plans/PLAN.json --execute
+python3 scripts/verify_translation_writeback.py --workspace brandlab --result brandlab/shopify/translation-writeback-results/RESULT.json
+```
+
+The command without `--execute` is only a preflight. Before real execution, BrandLab re-reads the Shopify content digest and blocks if the source changed. Any `userErrors` stops the batch. Read-back verification must pass before the task is complete.
 
 ## Security boundary
 
