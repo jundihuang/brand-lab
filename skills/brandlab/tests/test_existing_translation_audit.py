@@ -135,3 +135,87 @@ class ExistingTranslationAuditTest(ShopifyModeTestCase):
             '--limit', '10', *extra_args,
         )
         return json.loads((workspace / 'shopify/existing-translations/IT-manifest.json').read_text())
+
+    def audit(self, workspace: Path, extra_args: list[str] | None = None) -> dict:
+        self.run_cli(
+            'audit_existing_translations.py', '--workspace', str(workspace), '--market', 'IT',
+            *(extra_args or []),
+        )
+        return json.loads((workspace / 'reports/existing-translation-audit-IT.json').read_text())
+
+    def test_paired_ai_review_can_mark_semantic_failure(self) -> None:
+        workspace = self.temp_workspace()
+        self.init_shopify(workspace)
+        self.discover(workspace, 'existing-translations-paired.json')
+        first = self.audit(workspace)['items'][0]
+        review = workspace / 'ai-review.json'
+        review.write_text(json.dumps({
+            'reviews': [{
+                'item_id': first['item_id'],
+                'review_mode': 'paired_source',
+                'model': 'test-model',
+                'confidence': 0.94,
+                'source_digest': first['source_digest'],
+                'published_digest': first['published_digest'],
+                'findings': [{
+                    'type': 'mistranslation', 'severity': 'critical',
+                    'message': 'The product material is translated incorrectly.',
+                }],
+                'suggested_text': 'Minigonna corretta',
+                'recommendation': 'retranslate',
+            }]
+        }), encoding='utf-8')
+        report = self.audit(workspace, ['--ai-review', str(review)])
+        item = next(item for item in report['items'] if item['item_id'] == first['item_id'])
+        self.assertEqual(report['ai_review_count'], 1)
+        self.assertEqual(item['status'], 'fail')
+        self.assertEqual(item['recommendation'], 'retranslate')
+        self.assertEqual(item['ai_review']['model'], 'test-model')
+        self.assertIn('ai_mistranslation', {check['rule_id'] for check in item['checks']})
+        semantic = next(check for check in item['checks'] if check['rule_id'] == 'semantic_equivalence')
+        self.assertEqual(semantic['status'], 'passed')
+
+    def test_target_only_ai_review_lowers_confidence_and_stays_non_semantic(self) -> None:
+        workspace = self.temp_workspace()
+        self.init_shopify(workspace)
+        self.discover(workspace, 'existing-translations-target-only.json')
+        first = self.audit(workspace)['items'][0]
+        review = workspace / 'ai-review.json'
+        review.write_text(json.dumps([{
+            'item_id': first['item_id'],
+            'review_mode': 'target_only',
+            'confidence': 0.72,
+            'published_digest': first['published_digest'],
+            'findings': [{
+                'type': 'clarity_issue', 'severity': 'warning',
+                'message': 'The phrase is technically correct but unclear for shoppers.',
+            }],
+            'rewrite_suggestion': 'Vestido de seda para noche',
+            'recommendation': 'rewrite',
+        }]), encoding='utf-8')
+        report = self.audit(workspace, ['--ai-review', str(review)])
+        item = report['items'][0]
+        self.assertEqual(report['ai_review_count'], 1)
+        self.assertEqual(item['status'], 'warning')
+        self.assertEqual(item['recommendation'], 'rewrite')
+        self.assertEqual(item['ai_review']['rewrite_suggestion'], 'Vestido de seda para noche')
+        self.assertIn('ai_clarity_issue', {check['rule_id'] for check in item['checks']})
+        self.assertNotIn('semantic_equivalence', {check['rule_id'] for check in item['checks']})
+
+    def test_target_only_ai_review_rejects_semantic_conclusion(self) -> None:
+        workspace = self.temp_workspace()
+        self.init_shopify(workspace)
+        self.discover(workspace, 'existing-translations-target-only.json')
+        first = self.audit(workspace)['items'][0]
+        review = workspace / 'ai-review.json'
+        review.write_text(json.dumps([{
+            'item_id': first['item_id'], 'review_mode': 'target_only', 'confidence': 0.7,
+            'published_digest': first['published_digest'],
+            'findings': [{'type': 'mistranslation', 'severity': 'critical', 'message': 'Invalid claim'}],
+        }]), encoding='utf-8')
+        process = self.run_cli(
+            'audit_existing_translations.py', '--workspace', str(workspace), '--market', 'IT',
+            '--ai-review', str(review), expect_success=False,
+        )
+        self.assertEqual(process.returncode, 2)
+        self.assertIn("type 'mistranslation' is not allowed for target_only", process.stderr)

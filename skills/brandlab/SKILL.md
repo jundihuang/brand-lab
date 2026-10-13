@@ -135,7 +135,15 @@ Use this workflow when a market such as MX or IT already has translations. Disco
    python3 scripts/audit_existing_translations.py --workspace brandlab --market MX
    ```
 
-3. After the user selects audit items, create a local correction job:
+3. If the user asks for AI Review, create `reports/existing-translation-audit-MX-ai-review.jsonl` from the current audit JSON. Preserve each item ID, audit mode, source digest, and published digest. Then rerun:
+
+   ```bash
+   python3 scripts/audit_existing_translations.py --workspace brandlab --market MX --ai-review brandlab/reports/existing-translation-audit-MX-ai-review.jsonl
+   ```
+
+   Never add mistranslation, omission, or addition findings to a `target_only` item. Keep target-only confidence at `0.8` or lower. AI Review does not change Shopify.
+
+4. After the user selects audit items, create a local correction job:
 
    ```bash
    python3 scripts/create_correction_job.py --workspace brandlab --market MX --ids ITEM_ID_1,ITEM_ID_2
@@ -143,7 +151,7 @@ Use this workflow when a market such as MX or IT already has translations. Disco
 
    Use `--all-recommended` only when the user has agreed to process explicit recommendations. Use `--mode rewrite` for a `target_only` item when the user wants a rewrite.
 
-4. Reuse the standard translation, review, and approval workflow. A correction review shows the published text, source reference availability, audit mode, correction mode, and whether semantic validation is available.
+5. Reuse the standard translation, review, and approval workflow. A correction review shows the published text, source reference availability, audit mode, correction mode, and whether semantic validation is available.
 
 After translation approval, market corrections can use Shopify Translation API writeback:
 
