@@ -7,7 +7,7 @@ from base import BrandLabTestCase
 
 
 class ImportExportHardeningTest(BrandLabTestCase):
-    def write_model_translations(self, workspace: Path, job_id: str, translations: dict[str, str]) -> None:
+    def write_model_translations(self, workspace: Path, job_id: str, translations: dict[str, str], source_locale: str = "en") -> None:
         self.run_cli("translate_job.py", "--workspace", str(workspace), "--job", job_id)
         job = workspace / "jobs" / job_id
         worklist = [json.loads(line) for line in (job / "worklist.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -20,7 +20,7 @@ class ImportExportHardeningTest(BrandLabTestCase):
                 "item_id": row["item_id"],
                 "translated_text": translations[resource],
                 "source_digest": row["source_digest"],
-                "source_locale": "en",
+                "source_locale": source_locale,
                 "target_locale": "it-IT",
             })
         (job / "model-translations.jsonl").write_text(
@@ -33,9 +33,9 @@ class ImportExportHardeningTest(BrandLabTestCase):
             "--decision", "approve", "--item-id", "all", "--reviewer", "Jayce",
         )
 
-    def approved_job(self, workspace: Path, job_id: str, translations: dict[str, str]) -> None:
+    def approved_job(self, workspace: Path, job_id: str, translations: dict[str, str], source_locale: str = "en") -> None:
         self.run_cli("create_job.py", "--workspace", str(workspace), "--target-locale", "it-IT", "--job-id", job_id)
-        self.write_model_translations(workspace, job_id, translations)
+        self.write_model_translations(workspace, job_id, translations, source_locale)
 
     def read_csv(self, path: Path) -> list[dict[str, str]]:
         with path.open("r", encoding="utf-8", newline="") as handle:
@@ -45,17 +45,17 @@ class ImportExportHardeningTest(BrandLabTestCase):
         workspace = self.temp_workspace()
         self.init_workspace(workspace)
         source_csv = """Handle,Title,Body (HTML),SEO Title,SEO Description
-golden-glow,"Golden Glow Dress","<p>Golden Glow Dress</p>
-<p>Second line {{size_note}}</p>","Golden Glow Dress","Golden glow dress for evening looks."
+golden-glow,"金色光芒连衣裙","<p>金色光芒连衣裙。</p>
+<p>请参考 {{size_note}}</p>","金色光芒连衣裙","适合晚间场合的连衣裙。"
 """
         (workspace / "inbox" / "bom-products.csv").write_text(source_csv, encoding="utf-8-sig")
-        self.run_cli("import_content.py", "--workspace", str(workspace), "--source-locale", "en")
+        self.run_cli("import_content.py", "--workspace", str(workspace), "--source-locale", "zh-CN")
         self.approved_job(workspace, "bom-job", {
             "product_title": "Abito Golden Glow",
-            "product_description": "<p>Abito Golden Glow</p>\n<p>Seconda riga {{size_note}}</p>",
+            "product_description": "<p>Abito Golden Glow.</p>\n<p>Consulta {{size_note}}</p>",
             "seo_title": "Abito Golden Glow",
             "seo_description": "Abito Golden Glow per la sera.",
-        })
+        }, source_locale="zh-CN")
         output = workspace / "exports" / "bom.csv"
         self.run_cli(
             "build_export.py", "--workspace", str(workspace), "--job", "bom-job",
@@ -65,7 +65,7 @@ golden-glow,"Golden Glow Dress","<p>Golden Glow Dress</p>
         self.assertTrue(output.read_bytes().startswith(b"Handle"))
         rows = self.read_csv(output)
         self.assertEqual(len(rows), 1)
-        expected = "<p>Abito Golden Glow</p>\n<p>Seconda riga {{size_note}}</p>"
+        expected = "<p>Abito Golden Glow.</p>\n<p>Consulta {{size_note}}</p>"
         self.assertEqual(rows[0]["Body (HTML)"], expected)
         self.assertEqual(rows[0]["Title"], "Abito Golden Glow")
         self.assertEqual(rows[0]["SEO Description"], "Abito Golden Glow per la sera.")
