@@ -11,7 +11,8 @@ from pathlib import Path
 from brandlab_lib import (
     atomic_write_text,
     BrandLabError, append_history, atomic_write_json,
-    calculate_trust_score, extract_tags, glossary_for_locale,
+    calculate_trust_score, extract_placeholders, glossary_for_locale, inspect_html,
+    language_suspicion,
     load_guidelines, make_check, match_guidelines, normalize_term, read_catalog,
     read_glossary, resolve_workspace, rule_values, utc_now, write_jsonl_contract,
 )
@@ -19,42 +20,36 @@ from brandlab_lib import (
 
 def additional_content_checks(source: str, guidelines: list[dict], target_locale: str, duplicate_count: int = 1) -> list[dict[str, str]]:
     checks: list[dict[str, str]] = []
-    base_locale = target_locale.split("-", 1)[0].casefold()
-    words = set(re.findall(r"[a-z]+", source.casefold()))
-    language_markers = {
-        "en": {"the", "and", "with", "from", "made", "for"},
-        "it": {"il", "lo", "la", "con", "di", "per", "una", "realizzata"},
-        "fr": {"le", "la", "les", "avec", "pour", "une", "fabriquée"},
-        "es": {"el", "la", "los", "con", "para", "una", "hecha"},
-        "de": {"der", "die", "das", "mit", "für", "aus", "gefertigt"},
-    }
-    expected = language_markers.get(base_locale, set())
-    english = words & language_markers["en"]
-    if expected and len(words & expected) == 0 and len(english) >= 2:
+    language_mismatch, untranslated = language_suspicion(source, target_locale, "en")
+    if language_mismatch:
         checks.append(make_check("language_mismatch", "warning", "soft", "Content appears to remain in English rather than the target language."))
     else:
         checks.append(make_check("language_mismatch", "passed", "soft"))
-    if expected and len(english) >= 2:
+    if untranslated:
         checks.append(make_check("suspected_untranslated_source", "warning", "soft", "English marker words suggest untranslated source text."))
     else:
         checks.append(make_check("suspected_untranslated_source", "passed", "soft"))
 
-    open_braces = source.count("{")
-    close_braces = source.count("}")
-    percent_placeholders = len(re.findall(r"%[sdif]", source))
-    if (open_braces == close_braces and open_braces % 2 == 0) or percent_placeholders:
+    placeholder_issues = [
+        placeholder["token"] for placeholder in extract_placeholders(source)
+        if placeholder["token"].startswith("{{") and not placeholder["token"].endswith("}}")
+    ]
+    unbalanced_braces = source.count("{") != source.count("}")
+    if not placeholder_issues and not unbalanced_braces:
         checks.append(make_check("placeholder_integrity", "passed", "hard"))
     else:
         checks.append(make_check("placeholder_integrity", "failed", "hard", "Placeholder braces are unbalanced. Fix placeholder syntax."))
 
-    tags = extract_tags(source)
-    tag_counts = {}
-    for tag in tags:
-        tag_counts[tag] = tag_counts.get(tag, 0) + 1
-    if all(count % 2 == 0 for count in tag_counts.values()):
+    html = inspect_html(source)
+    if html.is_balanced and not html.scripts and not html.event_handlers and not html.unsafe_urls:
         checks.append(make_check("html_structure", "passed", "hard"))
     else:
-        checks.append(make_check("html_structure", "failed", "hard", "One or more HTML tags are unbalanced."))
+        problems = []
+        if not html.is_balanced:
+            problems.append("unbalanced or invalidly nested tags")
+        if html.scripts or html.event_handlers or html.unsafe_urls:
+            problems.append("unsafe HTML")
+        checks.append(make_check("html_structure", "failed", "hard", "; ".join(problems) + ". Fix HTML before use."))
 
     if duplicate_count > 1:
         checks.append(make_check("repeated_template_pattern", "warning", "soft", f"Exact source text repeats across {duplicate_count} items."))

@@ -49,6 +49,7 @@ def revalidate(args: argparse.Namespace) -> None:
             expected_source_locale=manifest["source_locale"], expected_target_locale=manifest["target_locale"],
             guidelines=item_guidelines, glossary=glossary,
             other_translations={value for key, value in outputs.items() if key != job_item["item_id"]},
+            resource_type=str(source.get("resource_type", "page_body")),
         )
         audit = {
             "item_id": job_item["item_id"], "status": item_status_from_checks(checks),

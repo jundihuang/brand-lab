@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["generated_at", "ok", "error_count", "warning_count", "files"],
+  "properties": {
+    "generated_at": {"type": "string", "minLength": 1},
+    "ok": {"type": "boolean"},
+    "error_count": {"type": "integer", "minimum": 0},
+    "warning_count": {"type": "integer", "minimum": 0},
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "errors"],
+        "properties": {
+          "path": {"type": "string"},
+          "id": {"type": "string"},
+          "status": {"type": "string"},
+          "errors": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    }
+  }
+}

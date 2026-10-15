@@ -3,13 +3,29 @@
   "type": "object",
   "required": ["id", "name", "resource_type", "target_locale", "status", "version", "rules"],
   "properties": {
-    "id": {"type": "string"},
-    "name": {"type": "string"},
-    "resource_type": {"type": "string"},
-    "target_locale": {"type": "string"},
+    "id": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"},
+    "name": {"type": "string", "minLength": 1},
+    "resource_type": {"type": "string", "minLength": 1},
+    "target_locale": {"type": "string", "pattern": "^[a-z]{2,3}([-_][A-Za-z0-9]{2,8})?$"},
     "market": {"type": "string"},
     "status": {"enum": ["active", "inactive", "draft"]},
     "version": {"type": "integer", "minimum": 1},
-    "rules": {"type": "array", "items": {"type": "object"}}
-  }
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": [
+              "instruction", "max_length", "min_length", "forbidden_term", "required_term",
+              "forbidden_regex", "required_regex", "legal_claim", "preserve",
+              "html_allowed_tags", "html_allowed_attributes"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
 }

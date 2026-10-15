@@ -70,6 +70,12 @@ If the user has no source files, ask them to place CSV, JSON, JSONL, Markdown, H
    python3 scripts/audit_content.py --workspace brandlab --target-locale it-IT
    ```
 
+   Before creating a job, lint brand rules:
+
+   ```bash
+   python3 scripts/lint_guidelines.py --workspace brandlab
+   ```
+
 4. Create a job. Statuses default to all actionable catalog items:
 
    ```bash
@@ -105,6 +111,8 @@ If the user has no source files, ask them to place CSV, JSON, JSONL, Markdown, H
    ```bash
    python3 scripts/build_review.py --workspace brandlab --job JOB_ID
    ```
+
+   Review now includes source, previous translation, new translation, digest state, and a unified diff.
 
 8. Ask the user to review `jobs/JOB_ID/review.md`. Do not approve without explicit instruction.
 

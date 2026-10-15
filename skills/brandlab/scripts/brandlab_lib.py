@@ -11,6 +11,7 @@ import sys
 import tempfile
 from collections import Counter
 from datetime import datetime, timezone
+from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from html.parser import HTMLParser
 from pathlib import Path
@@ -315,6 +316,102 @@ def market_for_locale(brand: dict[str, Any], target_locale: str) -> str:
     return locale_base(target_locale).upper()
 
 
+def lint_guideline(value: dict[str, Any], path: Path | str = "guideline") -> list[str]:
+    """Return deterministic, actionable lint errors for one guideline."""
+    errors: list[str] = []
+    guideline_id = str(value.get("id", ""))
+    locale = str(value.get("target_locale", ""))
+    market = str(value.get("market", ""))
+    if not re.match(r"^[A-Za-z][A-Za-z0-9_-]*$", guideline_id):
+        errors.append(f"{path}: id: use letters, numbers, hyphen, or underscore. Fix: rename {guideline_id!r}.")
+    if not str(value.get("name", "")).strip():
+        errors.append(f"{path}: name: cannot be empty. Fix: add a human-readable name.")
+    if not re.match(r"^[a-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?$", locale):
+        errors.append(f"{path}: target_locale: use BCP-47-style locale. Fix: {locale!r}.")
+    if market and market != "*" and not re.match(r"^[A-Z]{2,3}$", market):
+        errors.append(f"{path}: market: use an uppercase ISO-style market ID or '*'. Fix: {market!r}.")
+    if value.get("resource_type") != "*" and str(value.get("resource_type", "")) not in SUPPORTED_RESOURCE_TYPES:
+        errors.append(f"{path}: resource_type: unsupported {value.get('resource_type')!r}. Fix: use a supported Shopify resource type or '*'.")
+
+    rules = value.get("rules", [])
+    if not isinstance(rules, list):
+        errors.append(f"{path}: rules: must be a list. Fix: convert rules to a YAML list.")
+        return errors
+
+    lengths: list[int] = []
+    forbidden: set[str] = set()
+    required: set[str] = set()
+    for index, rule in enumerate(rules):
+        label = f"{path}:rules[{index}]"
+        if not isinstance(rule, dict):
+            errors.append(f"{label}: rule must be a mapping. Fix: use type/value fields.")
+            continue
+        rule_type = str(rule.get("type", ""))
+        if rule_type not in {
+            "instruction", "max_length", "min_length", "forbidden_term", "required_term",
+            "forbidden_regex", "required_regex", "legal_claim", "preserve",
+            "html_allowed_tags", "html_allowed_attributes",
+        }:
+            errors.append(f"{label}: type: unsupported rule type {rule_type!r}. Fix: use a supported rule type.")
+        if rule_type == "max_length":
+            if isinstance(rule.get("value"), int) and not isinstance(rule.get("value"), bool):
+                lengths.append(int(rule["value"]))
+            else:
+                errors.append(f"{label}: value: max_length requires an integer. Fix: set a character limit.")
+        if rule_type == "min_length" and (not isinstance(rule.get("value"), int) or isinstance(rule.get("value"), bool)):
+            errors.append(f"{label}: value: min_length requires an integer. Fix: set a character limit.")
+        if rule_type in {"forbidden_term", "required_term"}:
+            term = normalize_term(str(rule.get("value", "")))
+            if not term:
+                errors.append(f"{label}: value: {rule_type} cannot be empty.")
+            elif rule_type == "forbidden_term":
+                forbidden.add(term)
+            else:
+                required.add(term)
+        if rule_type == "forbidden_regex":
+            try:
+                re.compile(str(rule.get("pattern", "")))
+            except re.error as exc:
+                errors.append(f"{label}: pattern: invalid regex. Fix: {exc}.")
+        if rule_type == "required_regex":
+            try:
+                re.compile(str(rule.get("pattern", "")))
+            except re.error as exc:
+                errors.append(f"{label}: pattern: invalid regex. Fix: {exc}.")
+        if rule_type == "legal_claim":
+            for field_name in ("source_regex", "required_regex"):
+                try:
+                    re.compile(str(rule.get(field_name, "")))
+                except re.error as exc:
+                    errors.append(f"{label}: {field_name}: invalid regex. Fix: {exc}.")
+
+    if lengths and min(lengths) < 0:
+        errors.append(f"{path}: rules: max_length cannot be negative.")
+    minimums = [int(rule.get("value")) for rule in rules if isinstance(rule, dict) and rule.get("type") == "min_length" and isinstance(rule.get("value"), int)]
+    if lengths and minimums and max(minimums) > min(lengths):
+        errors.append(f"{path}: rules: min_length {max(minimums)} exceeds max_length {min(lengths)}. Fix: make ranges compatible.")
+    contradiction = sorted(forbidden & required)
+    if contradiction:
+        errors.append(f"{path}: rules: terms {contradiction} are both forbidden and required. Fix: resolve the contradiction.")
+    return errors
+
+
+def lint_guideline_cross_file(guidelines: list[tuple[Path, dict[str, Any]]]) -> None:
+    active_ids: dict[str, Path] = {}
+    duplicates: list[str] = []
+    for path, guideline in guidelines:
+        if guideline.get("status") != "active":
+            continue
+        guideline_id = str(guideline.get("id", ""))
+        if guideline_id in active_ids:
+            duplicates.append(guideline_id)
+        else:
+            active_ids[guideline_id] = path
+    if duplicates:
+        files = ", ".join(str(active_ids[value]) for value in duplicates)
+        raise BrandLabError(f"guidelines: duplicate active guideline IDs {duplicates} in {files}. Keep one active version per ID.")
+
+
 def load_guidelines(workspace: Path) -> list[tuple[Path, dict[str, Any]]]:
     root = workspace / "guidelines"
     result: list[tuple[Path, dict[str, Any]]] = []
@@ -332,6 +429,10 @@ def load_guidelines(workspace: Path) -> list[tuple[Path, dict[str, Any]]]:
             raise BrandLabError(f"{path}: rules must be a list.")
         validate_schema("guideline", value, path)
         result.append((path, value))
+        lint_errors = lint_guideline(value, path)
+        if lint_errors:
+            raise BrandLabError("; ".join(lint_errors))
+    lint_guideline_cross_file(result)
     return result
 
 
@@ -439,27 +540,199 @@ def normalize_term(value: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", value, flags=re.UNICODE)).casefold().strip()
 
 
-PLACEHOLDER_RE = re.compile(r"\{\{[^{}]*\}\}|\{[^{}]*\}|%[sdif]")
+LANGUAGE_MARKERS = {
+    "en": {"the", "and", "with", "from", "made", "for", "of"},
+    "it": {"il", "lo", "la", "con", "di", "per", "una", "realizzata"},
+    "fr": {"le", "la", "les", "avec", "pour", "une", "fabriquée"},
+    "es": {"el", "la", "los", "con", "para", "una", "hecha"},
+    "de": {"der", "die", "das", "mit", "für", "aus", "gefertigt"},
+    "pt": {"o", "a", "os", "as", "com", "para", "uma", "feita"},
+    "nl": {"de", "het", "een", "met", "voor", "van", "gemaakt"},
+}
+NON_LATIN_SCRIPTS = {
+    "ja": r"[\u3040-\u30ff\u4e00-\u9fff]",
+    "zh": r"[\u4e00-\u9fff]",
+    "ko": r"[\uac00-\ud7af]",
+    "ru": r"[\u0400-\u04ff]",
+}
+SHORT_TEXT_RESOURCES = {"product_title", "collection_title", "page_title", "blog_title", "seo_title", "seo_description", "product_variant"}
+PLACEHOLDER_RE = re.compile(
+    r"(?P<liquid>\{\{\s*[^{}]+\s*\}\})|(?P<icu>\{[^{},]+(?:\s*,[^{}]*)?\})|"
+    r"(?P<printf>%(?:\d+\$)?[*0-9.\-]*[sdif])|(?P<format>%<[^<>]+>[sdif])"
+)
+PRINTF_PLACEHOLDER_RE = re.compile(r"%(?:\d+\$)?[*0-9.\-]*[sdif]|%<[^<>]+>[sdif]")
+
+
+def _balanced_icu_end(value: str, start: int) -> int | None:
+    """Return the end of an ICU-style balanced brace token, including simple arguments."""
+    depth = 0
+    quote = ""
+    index = start
+    while index < len(value):
+        char = value[index]
+        if quote:
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char in {"'", '"'}:
+            quote = char
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+        index += 1
+    return None
+
+
+def extract_placeholders(value: str) -> list[dict[str, str]]:
+    """Extract deterministic placeholder tokens without changing their original text."""
+    placeholders: list[dict[str, str]] = []
+    index = 0
+    while index < len(value):
+        if value.startswith("{{", index):
+            end = value.find("}}", index + 2)
+            if end >= 0:
+                end += 2
+                placeholders.append({"type": "liquid", "token": value[index:end]})
+                index = end
+                continue
+        if value.startswith("{", index):
+            end = _balanced_icu_end(value, index)
+            if end is not None:
+                placeholders.append({"type": "icu", "token": value[index:end]})
+                index = end
+                continue
+        if value[index] == "%":
+            match = PRINTF_PLACEHOLDER_RE.match(value, index)
+            if match:
+                placeholder_type = "format" if match.group(0).startswith("%<") else "printf"
+                placeholders.append({"type": placeholder_type, "token": match.group(0)})
+                index = match.end()
+                continue
+        index += 1
+    return placeholders
+
+
+def language_suspicion(
+    translated: str,
+    target_locale: str,
+    source_locale: str = "en",
+    resource_type: str = "page_body",
+) -> tuple[bool, bool]:
+    """Return target-language-mismatch and untranslated-source suspicion."""
+    words = set(re.findall(r"[a-z]+", translated.casefold()))
+    target = locale_base(target_locale)
+    source = locale_base(source_locale or "en")
+    if target in NON_LATIN_SCRIPTS and re.search(NON_LATIN_SCRIPTS[target], translated):
+        return False, False
+    target_markers = LANGUAGE_MARKERS.get(target, set())
+    source_markers = LANGUAGE_MARKERS.get(source, set())
+    if source == target or not source_markers:
+        return False, False
+    source_hits = len(words & source_markers)
+    if target not in LANGUAGE_MARKERS:
+        return False, source_hits >= 1
+    threshold = 1 if resource_type in SHORT_TEXT_RESOURCES else 2
+    mismatch = len(words & target_markers) == 0 and source_hits >= threshold
+    untranslated = source_hits >= threshold
+    return mismatch, untranslated
+
+
+@dataclass
+class HtmlInspection:
+    tags: Counter = field(default_factory=Counter)
+    attributes: Counter = field(default_factory=Counter)
+    unclosed_tags: list[str] = field(default_factory=list)
+    unexpected_end_tags: list[str] = field(default_factory=list)
+    mismatched_end_tags: list[str] = field(default_factory=list)
+    scripts: list[str] = field(default_factory=list)
+    event_handlers: list[str] = field(default_factory=list)
+    unsafe_urls: list[str] = field(default_factory=list)
+
+    @property
+    def is_balanced(self) -> bool:
+        return not self.unclosed_tags and not self.unexpected_end_tags and not self.mismatched_end_tags
 
 
 class TagCollector(HTMLParser):
     VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+    BLOCKED_TAGS = {"script", "iframe", "object", "embed"}
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.tags: list[str] = []
+        self.attributes: list[str] = []
+        self.stack: list[str] = []
+        self.unclosed_tags: list[str] = []
+        self.unexpected_end_tags: list[str] = []
+        self.mismatched_end_tags: list[str] = []
+        self.scripts: list[str] = []
+        self.event_handlers: list[str] = []
+        self.unsafe_urls: list[str] = []
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.lower() not in self.VOID_TAGS:
-            self.tags.append(tag.lower())
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]], self_closing: bool = False) -> None:
+        name = tag.lower()
+        self.tags.append(name)
+        for attr_name, attr_value in attrs:
+            attr = attr_name.lower()
+            self.attributes.append(attr)
+            if attr.startswith("on"):
+                self.event_handlers.append(f"{name}@{attr}")
+            if attr in {"href", "src", "action"} and isinstance(attr_value, str) and re.match(
+                r"^\s*(javascript|vbscript|data\s*:\s*text/html)", attr_value, flags=re.I
+            ):
+                self.unsafe_urls.append(f"{name}@{attr}")
+        if name in self.BLOCKED_TAGS:
+            self.scripts.append(name)
+        if name not in self.VOID_TAGS and not self_closing:
+            self.stack.append(name)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.lower() not in self.VOID_TAGS:
-            self.tags.append(tag.lower())
+        self.handle_starttag(tag, attrs, self_closing=True)
 
     def handle_endtag(self, tag: str) -> None:
-        if tag.lower() not in self.VOID_TAGS:
-            self.tags.append(tag.lower())
+        name = tag.lower()
+        self.tags.append(name)
+        if name in self.VOID_TAGS:
+            return
+        if not self.stack:
+            self.unexpected_end_tags.append(name)
+            return
+        if self.stack[-1] == name:
+            self.stack.pop()
+            return
+        if name in self.stack:
+            while self.stack and self.stack[-1] != name:
+                self.mismatched_end_tags.append(self.stack.pop())
+            if self.stack:
+                self.stack.pop()
+        else:
+            self.unexpected_end_tags.append(name)
+
+    def close(self) -> None:
+        super().close()
+        self.unclosed_tags = list(self.stack)
+
+
+def inspect_html(value: str) -> HtmlInspection:
+    inspection = HtmlInspection()
+    if "<" not in value or ">" not in value:
+        return inspection
+    collector = TagCollector()
+    collector.feed(value)
+    collector.close()
+    inspection.tags = Counter(collector.tags)
+    inspection.attributes = Counter(collector.attributes)
+    inspection.unclosed_tags = collector.unclosed_tags
+    inspection.unexpected_end_tags = collector.unexpected_end_tags
+    inspection.mismatched_end_tags = collector.mismatched_end_tags
+    inspection.scripts = collector.scripts
+    inspection.event_handlers = collector.event_handlers
+    inspection.unsafe_urls = collector.unsafe_urls
+    return inspection
 
 
 def extract_tags(value: str) -> list[str]:
@@ -506,6 +779,7 @@ def validate_translation(
     guidelines: list[dict[str, Any]],
     glossary: list[dict[str, str]],
     other_translations: set[str] | None = None,
+    resource_type: str = "page_body",
 ) -> list[dict[str, str]]:
     checks: list[dict[str, str]] = []
     other_translations = other_translations or set()
@@ -536,31 +810,102 @@ def validate_translation(
 
     normalized_source = re.sub(r"\s+", " ", source).strip().casefold()
     normalized_output = re.sub(r"\s+", " ", translated).strip().casefold()
-    if normalized_source and normalized_source == normalized_output:
+    locked_values = {
+        normalize_term(row["target_term"])
+        for row in glossary
+        if row["status"] == "locked" and (
+            row.get("target_locale", "").lower() == target_locale.lower()
+            or locale_base(row.get("target_locale", "")) == locale_base(target_locale)
+        )
+    }
+    comparable_source = " ".join(part for part in re.split(r"\s+", normalized_source) if part not in locked_values)
+    comparable_output = " ".join(part for part in re.split(r"\s+", normalized_output) if part not in locked_values)
+    if normalized_source and normalized_source == normalized_output and locked_values and not comparable_source:
+        checks.append(make_check("untranslated_source", "passed", "soft", "Exact match consists only of locked terms."))
+    elif normalized_source and normalized_source == normalized_output:
         checks.append(make_check("untranslated_source", "warning", "soft", "Output is identical to the source after normalization."))
-    elif SequenceMatcher(None, normalized_source, normalized_output).ratio() >= 0.98 and len(normalized_source) > 24:
+    elif comparable_source and comparable_source == comparable_output:
+        checks.append(make_check("untranslated_source", "warning", "soft", "Output is identical to the source after removing locked terms."))
+    elif SequenceMatcher(None, comparable_source, comparable_output).ratio() >= 0.98 and len(comparable_source) > 24:
         checks.append(make_check("untranslated_source", "warning", "soft", "Output is nearly identical to the source."))
     else:
         checks.append(make_check("untranslated_source", "passed", "soft"))
 
-    source_placeholders = sorted(PLACEHOLDER_RE.findall(source))
-    output_placeholders = sorted(PLACEHOLDER_RE.findall(translated))
+    language_mismatch, language_untranslated = language_suspicion(
+        translated, target_locale, source_locale or expected_source_locale, resource_type
+    )
+    if language_mismatch:
+        checks.append(make_check(
+            "language_mismatch", "warning", "soft",
+            f"Output does not contain expected {expected_target_locale} language markers."
+        ))
+    else:
+        checks.append(make_check("language_mismatch", "passed", "soft"))
+
+    source_placeholders = extract_placeholders(source)
+    output_placeholders = extract_placeholders(translated)
     if source_placeholders == output_placeholders:
         checks.append(make_check("placeholder_parity", "passed", "hard"))
     else:
+        expected_tokens = [item["token"] for item in source_placeholders]
+        received_tokens = [item["token"] for item in output_placeholders]
         checks.append(make_check(
             "placeholder_parity", "failed", "hard",
-            f"Expected placeholders {source_placeholders}, received {output_placeholders}. Preserve every placeholder exactly."
+            f"Expected placeholders {expected_tokens}, received {received_tokens}. Preserve every placeholder type and token exactly."
         ))
 
-    source_tags = Counter(extract_tags(source))
-    output_tags = Counter(extract_tags(translated))
-    if source_tags == output_tags:
+    source_html = inspect_html(source)
+    output_html = inspect_html(translated)
+    if source_html.tags == output_html.tags and output_html.is_balanced:
         checks.append(make_check("html_tag_parity", "passed", "hard"))
     else:
+        problems = []
+        if source_html.tags != output_html.tags:
+            problems.append(f"expected tags {dict(source_html.tags)}, received {dict(output_html.tags)}")
+        if output_html.unclosed_tags:
+            problems.append(f"unclosed {output_html.unclosed_tags}")
+        if output_html.unexpected_end_tags:
+            problems.append(f"unexpected end tags {output_html.unexpected_end_tags}")
+        if output_html.mismatched_end_tags:
+            problems.append(f"mismatched nesting {output_html.mismatched_end_tags}")
         checks.append(make_check(
             "html_tag_parity", "failed", "hard",
-            f"Expected HTML tag multiset {dict(source_tags)}, received {dict(output_tags)}. Preserve all source tags."
+            "; ".join(problems) + ". Preserve all source tags and valid HTML nesting."
+        ))
+
+    if output_html.scripts or output_html.event_handlers or output_html.unsafe_urls:
+        checks.append(make_check(
+            "html_security", "failed", "hard",
+            f"Unsafe HTML found: scripts={output_html.scripts}, event handlers={output_html.event_handlers}, unsafe URLs={output_html.unsafe_urls}."
+        ))
+    else:
+        checks.append(make_check("html_security", "passed", "hard"))
+
+    allowed_tag_rules = rule_values(guidelines, "html_allowed_tags")
+    if allowed_tag_rules:
+        allowed_tags = {
+            str(value).lower()
+            for _, rule in allowed_tag_rules
+            for value in (rule.get("value") if isinstance(rule.get("value"), list) else [rule.get("value")])
+            if value
+        }
+        disallowed = sorted(set(output_html.tags) - allowed_tags)
+        checks.append(make_check(
+            "html_allowed_tags", "failed" if disallowed else "passed", "hard",
+            "" if not disallowed else f"Disallowed HTML tags {disallowed}. Use only {sorted(allowed_tags)}."
+        ))
+    allowed_attribute_rules = rule_values(guidelines, "html_allowed_attributes")
+    if allowed_attribute_rules:
+        allowed_attributes = {
+            str(value).lower()
+            for _, rule in allowed_attribute_rules
+            for value in (rule.get("value") if isinstance(rule.get("value"), list) else [rule.get("value")])
+            if value
+        }
+        disallowed = sorted(set(output_html.attributes) - allowed_attributes)
+        checks.append(make_check(
+            "html_allowed_attributes", "failed" if disallowed else "passed", "hard",
+            "" if not disallowed else f"Disallowed HTML attributes {disallowed}. Use only {sorted(allowed_attributes)}."
         ))
 
     matched_glossary = [
@@ -680,7 +1025,7 @@ def validate_translation(
             checks.append(make_check(f"preserve_placeholders:{guideline['id']}", "passed", "soft"))
         elif value == "placeholders":
             checks.append(make_check(f"preserve_placeholders:{guideline['id']}", "warning", "soft", "Placeholder parity failed; see placeholder_parity."))
-        elif value == "html_tags" and source_tags == output_tags:
+        elif value == "html_tags" and source_html.tags == output_html.tags:
             checks.append(make_check(f"preserve_html_tags:{guideline['id']}", "passed", "soft"))
         elif value == "html_tags":
             checks.append(make_check(f"preserve_html_tags:{guideline['id']}", "warning", "soft", "HTML parity failed; see html_tag_parity."))

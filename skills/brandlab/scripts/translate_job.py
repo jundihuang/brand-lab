@@ -162,6 +162,7 @@ def ingest_translations(workspace: Path, job_dir: Path, manifest: dict, input_pa
             expected_source_locale=manifest["source_locale"], expected_target_locale=manifest["target_locale"],
             guidelines=item_guidelines, glossary=glossary,
             other_translations={value for value in {**existing_outputs, **output_values}.values() if value} - {translated_text},
+            resource_type=str(source_snapshot.get("resource_type", "page_body")),
         )
         audit = {
             "item_id": item_id, "status": item_status_from_checks(checks),

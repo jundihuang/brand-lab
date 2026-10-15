@@ -5,6 +5,7 @@ import argparse
 import json
 import sys
 from collections import Counter
+from difflib import unified_diff
 from pathlib import Path
 
 from brandlab_lib import resolve_job_path, BrandLabError, append_history, atomic_write_text, load_job, read_json, resolve_workspace, save_job, render_audit_summary
@@ -23,6 +24,8 @@ def build_review(args: argparse.Namespace) -> None:
     job_dir, manifest = load_job(workspace, args.job)
     item_sections = []
     status_counts: Counter[str] = Counter()
+    hard_failure_count = 0
+    warning_count = 0
     score_total = 0
     scored_count = 0
     for job_item in manifest["items"]:
@@ -44,6 +47,8 @@ def build_review(args: argparse.Namespace) -> None:
         else:
             checks = []
             score = 0
+        hard_failure_count += sum(check.get("status") == "failed" and check.get("severity") == "hard" for check in checks)
+        warning_count += sum(check.get("status") == "warning" for check in checks)
         checks_table = ["| Rule | Status | Severity | Message |", "|---|---|---|---|"]
         for check in checks:
             message = str(check.get("message", "")).replace("|", "\\|").replace("\n", " ")
@@ -71,6 +76,39 @@ def build_review(args: argparse.Namespace) -> None:
             if suggestion:
                 correction_lines.extend(["", "```text", suggestion, "```"])
             correction_lines.append("")
+        previous = str(source_snapshot.get("previous_translation") or source_snapshot.get("published_text") or "")
+        previous_digest = str(source_snapshot.get("previous_translation_digest") or source_snapshot.get("published_digest") or "")
+        digest_state = "current" if job_item.get("source_digest") == source_snapshot.get("digest") else "revalidate"
+        context = source_snapshot.get("context") if isinstance(source_snapshot.get("context"), dict) else {}
+        field_name = str(
+            source_snapshot.get("field_key")
+            or source_snapshot.get("field")
+            or context.get("field")
+            or "content"
+        )
+        changed_fields = []
+        if output != source:
+            changed_fields.append(field_name)
+        if previous and output != previous:
+            changed_fields.append("previous_translation")
+        diff_lines = list(unified_diff(
+            source.splitlines(), output.splitlines(),
+            fromfile="source", tofile="new-translation", lineterm="",
+        )) if output else []
+        comparison_lines = [
+            "### Translation comparison", "",
+            f"- Resource type: `{source_snapshot.get('resource_type', '')}`",
+            f"- Field: `{field_name}`",
+            f"- Target locale: `{manifest['target_locale']}`",
+            f"- Source digest: `{job_item.get('source_digest', '')}`",
+            f"- Snapshot digest state: `{digest_state}`",
+            f"- Previous digest: `{previous_digest}`",
+            f"- Changed fields: `{', '.join(changed_fields) if changed_fields else 'none'}`",
+            f"- New translation differs from source: `{output != source}`",
+            f"- New translation differs from previous: `{output != previous}`", "",
+            "### Previous translation", "", "```text", previous, "```", "",
+            "### Unified diff", "", "```diff", *diff_lines, "```", "",
+        ]
         item_sections.append("\n".join([
             f"## `{item_id}`", "",
             f"- Resource: `{source_snapshot.get('resource_type', '')}`",
@@ -80,6 +118,7 @@ def build_review(args: argparse.Namespace) -> None:
             f"- Suggested decision: {decision(checks)}", "",
             "### Source reference" if correction else "### Source", "", "```text", source, "```", "",
             "### Translation", "", "```text", output, "```", "",
+            *comparison_lines,
             "### Checks", "", *checks_table, "",
         ]))
 
@@ -101,7 +140,10 @@ def build_review(args: argparse.Namespace) -> None:
     for status in ["pending", "translated", "needs_review", "approved", "rejected", "blocked", "exported", "stale"]:
         template.append(f"| `{status}` | {status_counts[status]} |")
     average = round(score_total / scored_count) if scored_count else 0
-    template += ["", f"- Average Trust Score: {average}", "", "## Review policy", "",
+    template += [
+        "", f"- Average Trust Score: {average}",
+        f"- Hard failures: {hard_failure_count}", f"- Warnings: {warning_count}", "",
+        "## Review policy", "",
                  "1. Do not approve a hard-rule failure.", "2. Review every warning.", "3. Approval is explicit and recorded with reviewer and source digest.", "",
                  "## Items", "", *item_sections,
                  "## Next action", "",

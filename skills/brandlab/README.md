@@ -164,6 +164,7 @@ BrandLab 会先给出一份新增市场计划，包括：
 | Shopify 发现内容 | `brandlab/shopify/discovery/` |
 | 已有市场翻译 | `brandlab/shopify/existing-translations/` |
 | 翻译体检报告 | `brandlab/reports/` |
+| 品牌规则检查报告 | `brandlab/reports/guideline-lint.md` |
 | 修复计划 | `brandlab/corrections/` |
 | 新增市场计划 | `brandlab/onboarding/` |
 | 多市场汇总 | `brandlab/reports/market-translation-summary.md` |

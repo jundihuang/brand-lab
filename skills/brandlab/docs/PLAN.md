@@ -584,6 +584,8 @@ Definition of done:
 
 ### M3.2 Translation quality hardening
 
+Status: Completed 2026-10-15.
+
 Tasks:
 
 1. Improve language suspicion checks.

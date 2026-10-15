@@ -2,4 +2,7 @@
 ## Summary
 ## Review policy
 ## Items
+### Translation comparison
+### Previous translation
+### Unified diff
 ## Next action
