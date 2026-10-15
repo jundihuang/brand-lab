@@ -81,11 +81,19 @@ golden-glow,"金色光芒连衣裙","<p>金色光芒连衣裙。</p>
         buffer = io.StringIO(newline="")
         writer = csv.DictWriter(buffer, fieldnames=["Handle", "Resource Type", "Translation"], lineterminator="\n")
         writer.writeheader()
+        sources = {
+            resource: f"Golden glow {resource.replace('_', ' ')}."
+            for resource in types
+        }
+        sources["page_body"] = "<p>Golden glow page.</p>\n<p>Learn more {{page_link}}</p>"
+        sources["blog_body"] = "<p>Golden glow story.</p>\n<p>Read the details {{blog_link}}</p>"
         for resource in types:
-            writer.writerow({"Handle": f"generic-{resource.replace('_', '-')}", "Resource Type": resource, "Translation": f"Golden glow {resource.replace('_', ' ')}."})
+            writer.writerow({"Handle": f"generic-{resource.replace('_', '-')}", "Resource Type": resource, "Translation": sources[resource]})
         (workspace / "inbox" / "generic.csv").write_text(buffer.getvalue(), encoding="utf-8")
         self.run_cli("import_content.py", "--workspace", str(workspace), "--source-locale", "en")
         translations = {resource: f"Contenuto {resource.replace('_', ' ')}." for resource in types}
+        translations["page_body"] = "<p>Pagina Golden Glow.</p>\n<p>Scopri di più {{page_link}}</p>"
+        translations["blog_body"] = "<p>Storia Golden Glow.</p>\n<p>Leggi i dettagli {{blog_link}}</p>"
         self.approved_job(workspace, "generic-job", translations)
         output = workspace / "exports" / "generic.csv"
         self.run_cli("build_export.py", "--workspace", str(workspace), "--job", "generic-job", "--format", "csv", "--output", "generic.csv")
@@ -94,6 +102,7 @@ golden-glow,"金色光芒连衣裙","<p>金色光芒连衣裙。</p>
         by_type = {row["Resource Type"]: row for row in rows}
         for resource in types:
             self.assertEqual(by_type[resource]["Translation"], translations[resource])
+            self.assertEqual(by_type[resource]["Original"], sources[resource])
             self.assertEqual(by_type[resource]["Handle"], f"generic-{resource.replace('_', '-')}")
 
     def test_custom_field_mapping_controls_import_and_export_headers(self) -> None:
