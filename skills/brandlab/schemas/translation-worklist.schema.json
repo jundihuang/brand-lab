@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["item_id", "source", "source_digest", "source_locale", "target_locale"],
+  "properties": {
+    "item_id": {"type": "string", "minLength": 1},
+    "source": {"type": "string"},
+    "source_digest": {"type": "string", "minLength": 1},
+    "source_locale": {"type": "string", "minLength": 1},
+    "target_locale": {"type": "string", "minLength": 1},
+    "context": {"type": "object"},
+    "guidelines": {"type": "array", "items": {"type": "object"}}
+  }
+}

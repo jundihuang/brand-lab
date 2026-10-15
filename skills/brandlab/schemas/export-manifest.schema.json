@@ -1,17 +1,58 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["export_id", "job_id", "format", "locale", "item_count", "approved_only", "output_path"],
+  "required": [
+    "export_id",
+    "job_id",
+    "format",
+    "locale",
+    "item_count",
+    "approved_only",
+    "output_path"
+  ],
   "properties": {
-    "export_id": {"type": "string"},
-    "job_id": {"type": "string"},
-    "format": {"type": "string"},
-    "locale": {"type": "string"},
-    "item_count": {"type": "integer"},
-    "approved_only": {"type": "boolean"},
-    "output_path": {"type": "string"},
-    "manifest_path": {"type": "string"},
-    "created_at": {"type": "string"},
-    "content_digest": {"type": "string"}
+    "export_id": {
+      "type": "string"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "format": {
+      "type": "string"
+    },
+    "locale": {
+      "type": "string"
+    },
+    "item_count": {
+      "type": "integer"
+    },
+    "approved_only": {
+      "type": "boolean"
+    },
+    "output_path": {
+      "type": "string"
+    },
+    "manifest_path": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "content_digest": {
+      "type": "string"
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "item_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
   }
 }

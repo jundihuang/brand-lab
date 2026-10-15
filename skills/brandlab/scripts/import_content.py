@@ -14,7 +14,7 @@ import yaml
 from brandlab_lib import (
     ACTIONABLE_CATALOG_STATUSES, BrandLabError, atomic_write_text, append_history,
     load_brand, read_catalog, read_csv_rows, read_jsonl, resolve_workspace,
-    sha256_text, slug, utc_now, write_catalog, write_jsonl,
+    sha256_text, slug, utc_now, write_catalog, write_jsonl_contract,
 )
 
 
@@ -315,7 +315,7 @@ def import_files(args: argparse.Namespace) -> None:
         lines.append(f"| `{row['id']}` | {row['state']} | `{row['file']}` | {row['resource_type']} | {row['source_locale']} | {row['target_locale']} |")
     lines += ["", "## Next action", "", "Run audit_content.py for a target locale, then create a translation job."]
     atomic_write_text(report_path, "\n".join(lines) + "\n")
-    write_jsonl(workspace / "reports" / "import-report.jsonl", imported_rows)
+    write_jsonl_contract(workspace / "reports" / "import-report.jsonl", imported_rows, "import-report")
     append_history(workspace, "content_imported", {"files": [str(path) for path in paths], "counts": counts})
     print(json.dumps({"result": "ok", "counts": counts, "report": str(report_path)}, ensure_ascii=False))
     print("Next: python3 scripts/audit_content.py --workspace " + str(workspace) + " --target-locale " + target_locales[0])

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["decisions"],
+  "properties": {
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item_id", "decision", "recorded_status", "reviewer", "source_digest", "timestamp"],
+        "properties": {
+          "item_id": {"type": "string", "minLength": 1},
+          "decision": {"enum": ["approve", "reject", "request_changes"]},
+          "recorded_status": {"enum": ["approved", "rejected", "needs_review"]},
+          "reviewer": {"type": "string", "minLength": 1},
+          "source_digest": {"type": "string", "minLength": 1},
+          "timestamp": {"type": "string", "minLength": 1},
+          "note": {"type": "string"}
+        }
+      }
+    }
+  }
+}

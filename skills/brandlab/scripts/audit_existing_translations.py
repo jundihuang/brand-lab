@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Any
 
 from brandlab_lib import (
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json, extract_tags, find_market,
     glossary_for_locale, load_brand, load_guidelines, make_check, match_guidelines,
-    normalize_term, read_glossary, resolve_workspace, rule_values, slug, utc_now,
+    normalize_term, read_glossary, read_jsonl_contract, resolve_workspace, rule_values, slug, utc_now, validate_schema,
 )
 
 PAIRED_ONLY_SKIPPED = [
@@ -367,7 +368,7 @@ def audit(args: argparse.Namespace) -> None:
         absolute = snapshot_path if snapshot_path.is_absolute() else workspace / snapshot_path
         raise BrandLabError(f'{snapshot_path}: existing translation snapshot is missing. Run shopify_discover_existing.py first.')
     from brandlab_lib import read_jsonl
-    rows = read_jsonl(snapshot_path)
+    rows = read_jsonl_contract(snapshot_path, "existing-translation")
     if not rows:
         raise BrandLabError(f'{snapshot_path}: snapshot is empty. Re-run existing translation discovery.')
 
@@ -400,6 +401,7 @@ def audit(args: argparse.Namespace) -> None:
         'ai_review_count': sum(item['ai_review'] is not None for item in results),
     }
     report_json = workspace / 'reports' / f'existing-translation-audit-{market_slug}.json'
+    validate_schema("existing-translation-audit", report_doc, report_json)
     atomic_write_json(report_json, report_doc)
 
     origins = sorted({str(item['source_origin']) for item in results if item['source_origin']})
@@ -419,7 +421,7 @@ def audit(args: argparse.Namespace) -> None:
     lines += ['', '## Next action', '']
     lines.append('Review warnings and failures, then request a correction plan. This audit did not modify Shopify.')
     report_md = workspace / 'reports' / f'existing-translation-audit-{market_slug}.md'
-    report_md.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    atomic_write_text(report_md, '\n'.join(lines) + '\n')
     append_history(workspace, 'existing_translation_audited', {
         'audit_id': audit_id, 'market': market_id, 'items': len(results), 'counts': dict(counts),
         'ai_reviewed': sum(item['ai_review'] is not None for item in results),

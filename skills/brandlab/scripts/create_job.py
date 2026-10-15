@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 from brandlab_lib import (
-    ACTIONABLE_CATALOG_STATUSES, BrandLabError, append_history, atomic_write_json,
+    ACTIONABLE_CATALOG_STATUSES, BrandLabError, append_history, atomic_write_json, atomic_write_text,
     glossary_digest, glossary_for_locale, load_brand, load_guidelines, load_glossary_snapshot,
     market_for_locale, match_guidelines, read_catalog, read_glossary, resolve_workspace,
     save_job, slug, utc_now,
@@ -84,13 +84,13 @@ def create_job(args: argparse.Namespace) -> None:
 
     all_glossary = read_glossary(workspace / "glossary" / "glossary.csv")
     job_glossary = glossary_for_locale(all_glossary, target_locale)
-    (context_dir / "glossary.csv").write_text(
+    atomic_write_text(
+        context_dir / "glossary.csv",
         "source_term,target_term,target_locale,status,note\n" +
         "".join(
             ",".join('"'+str(row.get(field, "")).replace('"', '""')+'"' for field in ["source_term", "target_term", "target_locale", "status", "note"]) + "\n"
             for row in job_glossary
         ),
-        encoding="utf-8",
     )
 
     job_items = []

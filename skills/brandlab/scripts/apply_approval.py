@@ -7,8 +7,9 @@ import sys
 from pathlib import Path
 
 from brandlab_lib import (
-    BrandLabError, append_history, atomic_write_json, load_job, read_json,
-    resolve_workspace, save_job, utc_now,
+    resolve_job_path,
+    BrandLabError, append_history, atomic_write_json, load_job, read_json, read_json_contract,
+    resolve_workspace, save_job, utc_now, write_json_contract,
 )
 
 
@@ -37,7 +38,7 @@ def update_correction_audit_state(workspace: Path, manifest: dict, targets: list
     if not report_value:
         raise BrandLabError("correction audit state: job manifest is missing audit_report.")
     report_path = workspace / str(report_value)
-    report = read_json(report_path)
+    report = read_json_contract(report_path, "existing-translation-audit")
     by_id = {item.get("item_id"): item for item in report.get("items", [])}
     now = utc_now()
     for target in targets:
@@ -59,7 +60,7 @@ def apply(args: argparse.Namespace) -> None:
     workspace = resolve_workspace(Path(args.workspace))
     job_dir, manifest = load_job(workspace, args.job)
     approval_path = job_dir / "approvals.json"
-    approval_state = read_json(approval_path) if approval_path.exists() else {"decisions": []}
+    approval_state = read_json_contract(approval_path, "approval-state") if approval_path.exists() else {"decisions": []}
     if not isinstance(approval_state, dict) or not isinstance(approval_state.get("decisions"), list):
         raise BrandLabError(f"{approval_path}: approvals must be an object with a decisions list.")
 
@@ -69,8 +70,8 @@ def apply(args: argparse.Namespace) -> None:
         targets = []
         skipped: list[tuple[str, str]] = []
         for job_item in manifest["items"]:
-            audit_path = job_dir / job_item["audit_path"]
-            audit = read_json(audit_path) if audit_path.exists() else {"checks": []}
+            audit_path = resolve_job_path(job_dir, job_item["audit_path"])
+            audit = read_json_contract(audit_path, "audit-result") if audit_path.exists() else {"checks": []}
             ok, reason = eligible_for_approval(job_item, audit)
             if ok:
                 targets.append(job_item)
@@ -89,8 +90,8 @@ def apply(args: argparse.Namespace) -> None:
         for job_item in manifest["items"]:
             if job_item["item_id"] not in requested_ids:
                 continue
-            audit_path = job_dir / job_item["audit_path"]
-            audit = read_json(audit_path) if audit_path.exists() else {"checks": []}
+            audit_path = resolve_job_path(job_dir, job_item["audit_path"])
+            audit = read_json_contract(audit_path, "audit-result") if audit_path.exists() else {"checks": []}
             if args.decision == "approve":
                 ok, reason = eligible_for_approval(job_item, audit)
                 if not ok:
@@ -116,7 +117,7 @@ def apply(args: argparse.Namespace) -> None:
             job_item.pop("approved_at", None)
             job_item.pop("exported_at", None)
 
-    atomic_write_json(approval_path, approval_state)
+    write_json_contract(approval_path, approval_state, "approval-state")
     statuses = [item["status"] for item in manifest["items"]]
     if "pending" in statuses or "stale" in statuses or "needs_review" in statuses or "blocked" in statuses:
         manifest["status"] = "review"

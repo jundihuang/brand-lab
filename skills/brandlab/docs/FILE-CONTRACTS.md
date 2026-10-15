@@ -230,6 +230,38 @@ Path: `shopify/translation-writeback-results/EXECUTION_ID.json`
 
 An executed result contains one status per item. The read-back verifier updates each item to `verified` or `mismatched`, sets the top-level result status, and writes `EXECUTION_ID.verification.md`.
 
+## Approval state
+
+Path: `jobs/JOB_ID/approvals.json`
+
+Root shape: `{"decisions": []}`. Each decision records `item_id`, `decision`, `recorded_status`, `reviewer`, `source_digest`, `timestamp`, and optional `note`. This file is the machine-readable source for approval digests.
+
+## Discovery manifests
+
+- Shopify source discovery: `shopify/discovery/MARKET-manifest.json`
+- Existing translation discovery: `shopify/existing-translations/MARKET-manifest.json`
+- Market onboarding: `onboarding/market-onboarding-MARKET-DATE.json`
+
+Manifests point to their normalized JSONL records and raw diagnostic output. Operators use manifests as indexes; generated JSONL records are validated row by row.
+
+## Translation worklist
+
+Path: `jobs/JOB_ID/worklist.jsonl`
+
+Each row records the item ID, source text and digest, source and target locales, and relevant guideline context. `translate_job.py` writes this worklist before prompting the model.
+
+## Translation writeback result
+
+Path: `shopify/translation-writeback-results/EXECUTION_ID.json`
+
+The execution result records execution/batch IDs, store and locale, top-level status, raw output path, and one item status. Verification updates top-level and item status to `verified` or `mismatched`.
+
+## Content audit
+
+Path: `reports/content-audit.jsonl`
+
+Each row records `item_id`, `status` (`ok`, `needs_review`, or `blocked`), `trust_score`, guideline versions, checks, and recommendation.
+
 ## History
 
 Path: `history/events.jsonl`

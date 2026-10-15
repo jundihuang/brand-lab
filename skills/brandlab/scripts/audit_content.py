@@ -9,10 +9,11 @@ from collections import Counter
 from pathlib import Path
 
 from brandlab_lib import (
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json,
     calculate_trust_score, extract_tags, glossary_for_locale,
     load_guidelines, make_check, match_guidelines, normalize_term, read_catalog,
-    read_glossary, resolve_workspace, rule_values, utc_now, write_jsonl,
+    read_glossary, resolve_workspace, rule_values, utc_now, write_jsonl_contract,
 )
 
 
@@ -195,7 +196,7 @@ def audit(args: argparse.Namespace) -> None:
         results.append(result)
 
     output_json = workspace / "reports" / "content-audit.jsonl"
-    write_jsonl(output_json, results)
+    write_jsonl_contract(output_json, results, "content-audit")
     status_counts = Counter(str(row["status"]) for row in results)
     recommendation_counts = Counter(str(row["recommendation"]) for row in results)
     lines = [
@@ -211,7 +212,7 @@ def audit(args: argparse.Namespace) -> None:
         lines.append(f"| `{row['item_id']}` | {row['resource_type']} | {row['status']} | {row['trust_score']} | {row['recommendation']} |")
     lines += ["", "## Next action", "", "Run create_job.py for items that should be translated."]
     report_path = workspace / "reports" / "content-audit.md"
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(report_path, "\n".join(lines) + "\n")
     append_history(workspace, "content_audited", {"target_locale": target_locale, "item_count": len(results)})
     print(json.dumps({"result": "ok", "items": len(results), "status": status_counts, "report": str(report_path)}))
     print("Next: python3 scripts/create_job.py --workspace " + str(workspace) + " --target-locale " + target_locale)

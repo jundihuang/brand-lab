@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "onboarding_id",
+    "market",
+    "target_locale",
+    "shopify_locale",
+    "status",
+    "created_at",
+    "config_plan",
+    "content_plan"
+  ],
+  "properties": {
+    "onboarding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market": {
+      "type": "string",
+      "minLength": 1
+    },
+    "locale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "shopify_locale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "ready",
+        "partial",
+        "failed"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_locale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_language": {
+      "type": "string"
+    },
+    "config_updated": {
+      "type": "boolean"
+    },
+    "shopify_market": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "config_plan": {
+      "type": "object"
+    },
+    "content_plan": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "guideline_recommendation": {
+      "type": "object"
+    },
+    "glossary_recommendation": {
+      "type": "object"
+    }
+  }
+}

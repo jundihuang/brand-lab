@@ -1,25 +1,139 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["job_id", "status", "mode", "source_locale", "target_locale", "items"],
+  "required": [
+    "job_id",
+    "status",
+    "mode",
+    "source_locale",
+    "target_locale",
+    "items"
+  ],
   "properties": {
-    "job_id": {"type": "string"},
-    "status": {"enum": ["draft", "ready", "translating", "review", "approved", "exported", "failed", "archived"]},
-    "mode": {"enum": ["pure", "shopify_controlled"]},
-    "source_locale": {"type": "string"},
-    "target_locale": {"type": "string"},
-    "market": {"type": "string"},
-    "job_type": {"enum": ["translation", "market_translation_correction"]},
-    "audit_id": {"type": "string"},
-    "audit_mode": {"enum": ["paired_source", "target_only", "mixed"]},
-    "correction_mode": {"enum": ["fix", "retranslate", "rewrite", "localize"]},
-    "semantic_validation_available": {"type": "boolean"},
-    "filters": {"type": "object"},
-    "guidelines": {"type": "array"},
-    "glossary_digest": {"type": "string"},
-    "glossary": {"type": "array"},
-    "created_at": {"type": "string"},
-    "updated_at": {"type": "string"},
-    "items": {"type": "array"}
+    "job_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "ready",
+        "translating",
+        "review",
+        "approved",
+        "exported",
+        "failed",
+        "archived"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "pure",
+        "shopify_controlled"
+      ]
+    },
+    "source_locale": {
+      "type": "string"
+    },
+    "target_locale": {
+      "type": "string"
+    },
+    "market": {
+      "type": "string"
+    },
+    "job_type": {
+      "enum": [
+        "translation",
+        "market_translation_correction"
+      ]
+    },
+    "audit_id": {
+      "type": "string"
+    },
+    "audit_mode": {
+      "enum": [
+        "paired_source",
+        "target_only",
+        "mixed"
+      ]
+    },
+    "correction_mode": {
+      "enum": [
+        "fix",
+        "retranslate",
+        "rewrite",
+        "localize"
+      ]
+    },
+    "semantic_validation_available": {
+      "type": "boolean"
+    },
+    "filters": {
+      "type": "object"
+    },
+    "guidelines": {
+      "type": "array"
+    },
+    "glossary_digest": {
+      "type": "string"
+    },
+    "glossary": {
+      "type": "array"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "status",
+          "source_digest",
+          "source_path",
+          "translation_path",
+          "audit_path"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "translated",
+              "needs_review",
+              "approved",
+              "rejected",
+              "blocked",
+              "exported",
+              "stale",
+              "verified",
+              "mismatched"
+            ]
+          },
+          "source_digest": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "translation_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "audit_path": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
   }
 }

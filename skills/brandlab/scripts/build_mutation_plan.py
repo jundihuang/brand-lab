@@ -8,8 +8,10 @@ from collections import defaultdict
 from pathlib import Path
 
 from brandlab_lib import (
+    resolve_job_path,
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json, load_brand, load_job,
-    read_json, resolve_workspace, slug, utc_now,
+    read_json, read_json_contract, resolve_workspace, slug, utc_now,
 )
 from mutation_lib import PRODUCT_FIELD_MAP, approval_digest, plan_digest
 from shopify_connector import ShopifyConnector
@@ -50,7 +52,7 @@ def build_plan(args: argparse.Namespace) -> None:
     job_dir, manifest = load_job(workspace, args.job)
     if manifest.get("mode") != "shopify_controlled":
         raise BrandLabError(f"{job_dir / 'manifest.json'}: mutation planning requires a shopify_controlled job.")
-    approval_state = read_json(job_dir / "approvals.json") if (job_dir / "approvals.json").exists() else {"decisions": []}
+    approval_state = read_json_contract(job_dir / "approvals.json", "approval-state") if (job_dir / "approvals.json").exists() else {"decisions": []}
     requested_ids = parse_ids(args.ids)
     selected: list[dict] = []
     rejected: list[tuple[str, str]] = []
@@ -60,7 +62,7 @@ def build_plan(args: argparse.Namespace) -> None:
         if job_item.get("status") != "approved":
             rejected.append((job_item["item_id"], f"status {job_item.get('status')} is not approved"))
             continue
-        source = read_json(job_dir / job_item["source_path"])
+        source = read_json(resolve_job_path(job_dir, job_item["source_path"]))
         resource_type = source.get("resource_type")
         if resource_type not in PRODUCT_FIELD_MAP:
             rejected.append((job_item["item_id"], f"resource_type {resource_type} is not mutation-mappable in MVP"))
@@ -68,10 +70,10 @@ def build_plan(args: argparse.Namespace) -> None:
         if not source.get("context", {}).get("shopify_resource_id"):
             rejected.append((job_item["item_id"], "source snapshot has no shopify_resource_id"))
             continue
-        if not (job_dir / job_item["translation_path"]).exists():
+        if not resolve_job_path(job_dir, job_item["translation_path"]).exists():
             rejected.append((job_item["item_id"], "translation file is missing"))
             continue
-        translation = read_json(job_dir / job_item["translation_path"])
+        translation = read_json(resolve_job_path(job_dir, job_item["translation_path"]))
         if translation.get("source_digest") != job_item.get("source_digest"):
             rejected.append((job_item["item_id"], "translation source digest does not match job snapshot"))
             continue
@@ -178,7 +180,7 @@ def build_plan(args: argparse.Namespace) -> None:
     preview_lines += ["## GraphQL", "", "```graphql", query, "```", ""]
     preview_lines += ["## Variables", "", "```json", json.dumps(variables, ensure_ascii=False, indent=2), "```", "", "## Next action", "", "Review this file, then run approve_mutation_plan.py. Execution remains disabled until approval and a separate --execute command."]
     preview_path = plan_dir / f"{batch_id}-review.md"
-    preview_path.write_text("\n".join(preview_lines) + "\n", encoding="utf-8")
+    atomic_write_text(preview_path, "\n".join(preview_lines) + "\n")
     append_history(workspace, "shopify_mutation_planned", {
         "batch_id": batch_id, "job_id": args.job, "item_count": len(selected),
         "plan": str(plan_path.relative_to(workspace)), "preview": str(preview_path.relative_to(workspace)),

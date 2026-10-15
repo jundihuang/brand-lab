@@ -8,8 +8,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from brandlab_lib import (
-    BrandLabError, append_history, atomic_write_json, load_job, read_json,
-    resolve_workspace, save_job, utc_now,
+    atomic_write_text,
+    BrandLabError, append_history, atomic_write_json, load_job, read_json, read_json_contract,
+    resolve_workspace, save_job, utc_now, validate_schema,
 )
 from mutation_lib import load_plan, save_plan
 from shopify_connector import ShopifyConnector
@@ -54,7 +55,7 @@ def verify(args: argparse.Namespace) -> None:
         candidate = workspace / result_path
         result_path = candidate if candidate.exists() else result_path.expanduser().resolve()
     result_path = result_path.resolve()
-    result = read_json(result_path)
+    result = read_json_contract(result_path, "execution-result")
     if result.get("status") not in {"executed", "failed"}:
         raise BrandLabError(f"{result_path}: execution status must be executed or failed.")
     plans_dir = workspace / "shopify" / "mutation-plans"
@@ -97,6 +98,7 @@ def verify(args: argparse.Namespace) -> None:
             }
     statuses = [item["status"] for item in result["items"]]
     verification_status = "failed" if "failed" in statuses else "mismatched" if "mismatched" in statuses else "verified" if statuses else "failed"
+    validate_schema("execution-result", result, result_path)
     atomic_write_json(result_path, result)
     save_plan(plan_path, plan)
     if verification_status == "verified":
@@ -116,7 +118,7 @@ def verify(args: argparse.Namespace) -> None:
         readback = str(item.get("readback", "")).replace("|", "\\|").replace("\n", " ")
         lines.append(f"| `{item['item_id']}` | `{item['field']}` | {readback} | `{item['status']}` |")
     lines += ["", "## Next action", "", "No later batch may run while a mismatch exists." if verification_status != "verified" else "All executed items verified."]
-    summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(summary_path, "\n".join(lines) + "\n")
     append_history(workspace, "shopify_execution_verified", {
         "batch_id": result["batch_id"], "execution_id": result["execution_id"],
         "status": verification_status, "result": str(result_path.relative_to(workspace)),

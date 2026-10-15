@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import argparse
+import io
 import csv
 import json
 import sys
 from pathlib import Path
 from typing import Any
 
-from brandlab_lib import (
+from brandlab_lib import (    read_json_contract,
+
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json, find_market,
     glossary_digest, glossary_for_locale, load_brand, load_guidelines,
     match_guidelines, read_glossary, read_json, resolve_workspace, save_job,
@@ -56,7 +59,7 @@ def correction_mode(item: dict[str, Any], requested: str) -> str:
 
 
 def mark_audit_items(report_path: Path, selected: list[dict[str, Any]], job_id: str, mode: str) -> None:
-    report = read_json(report_path)
+    report = read_json_contract(report_path, "existing-translation-audit")
     by_id = {item.get("item_id"): item for item in report.get("items", [])}
     now = utc_now()
     for item in selected:
@@ -139,10 +142,11 @@ def create_job(args: argparse.Namespace) -> None:
     guideline_items = load_guidelines(workspace)
     all_glossary = read_glossary(workspace / "glossary" / "glossary.csv")
     job_glossary = glossary_for_locale(all_glossary, target_locale)
-    with (job_dir / "context" / "glossary.csv").open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["source_term", "target_term", "target_locale", "status", "note"])
-        writer.writeheader()
-        writer.writerows({key: row.get(key, "") for key in writer.fieldnames} for row in job_glossary)
+    csv_content = io.StringIO(newline="")
+    writer = csv.DictWriter(csv_content, fieldnames=["source_term", "target_term", "target_locale", "status", "note"])
+    writer.writeheader()
+    writer.writerows({key: row.get(key, "") for key in writer.fieldnames} for row in job_glossary)
+    atomic_write_text(job_dir / "context" / "glossary.csv", csv_content.getvalue())
 
     guideline_refs: list[dict[str, Any]] = []
     job_items: list[dict[str, Any]] = []
@@ -239,7 +243,7 @@ def create_job(args: argparse.Namespace) -> None:
     plan_lines += ["", "This plan only creates a local correction job. It did not modify Shopify.", ""]
     plan_path = workspace / "corrections" / f"correction-plan-{slug(market_id)}-{job_id}.md"
     plan_path.parent.mkdir(parents=True, exist_ok=True)
-    plan_path.write_text("\n".join(plan_lines), encoding="utf-8")
+    atomic_write_text(plan_path, "\n".join(plan_lines))
     append_history(workspace, "correction_job_created", {
         "job_id": job_id, "audit_id": report.get("audit_id"), "market": market_id,
         "correction_mode": correction_mode_value, "items": len(job_items),

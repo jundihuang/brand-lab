@@ -8,10 +8,13 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from brandlab_lib import (
+from brandlab_lib import (    validate_schema,
+
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json, load_brand, market_for_locale,
-    read_catalog, resolve_workspace, sha256_text, stable_id, utc_now, write_catalog,
+    read_catalog, read_jsonl_contract, resolve_workspace, sha256_text, stable_id, utc_now, write_catalog,
     write_jsonl,
+    write_jsonl_contract,
 )
 from shopify_connector import ShopifyConnector
 
@@ -205,7 +208,7 @@ def discover(args: argparse.Namespace) -> None:
     query_path = workspace / "shopify" / "discovery" / "discovery-query.graphql"
     query_path.parent.mkdir(parents=True, exist_ok=True)
     query = resource_query(requested)
-    query_path.write_text(query + "\n", encoding="utf-8")
+    atomic_write_text(query_path, query + "\n")
 
     operation_id = f"discovery_{utc_now().replace(':', '').replace('-', '', 2).replace('+', 'z')}"
     connector = ShopifyConnector(
@@ -231,7 +234,7 @@ def discover(args: argparse.Namespace) -> None:
     for record in raw_records:
         record["source_locale"] = _source
     records_path = workspace / "shopify" / "discovery" / f"{operation_id}-resources.jsonl"
-    write_jsonl(records_path, raw_records)
+    write_jsonl_contract(records_path, raw_records, "shopify-discovery-record")
     new_count, changed_count, unchanged_count = import_discovery(workspace, raw_records)
 
     markets = data.get("markets")
@@ -251,10 +254,11 @@ def discover(args: argparse.Namespace) -> None:
         "warnings": warnings,
     }
     manifest_path = workspace / "shopify" / "discovery" / f"{discovery_id}.json"
+    validate_schema("shopify-discovery", manifest, manifest_path)
     atomic_write_json(manifest_path, manifest)
     atomic_write_json(workspace / "shopify" / "discovery" / "latest.json", manifest)
     latest_source = workspace / "shopify" / "discovery" / "latest-source-content.jsonl"
-    latest_source.write_text(records_path.read_text(encoding="utf-8"), encoding="utf-8")
+    atomic_write_text(latest_source, records_path.read_text(encoding="utf-8"))
 
     report_lines = [
         "# Shopify Discovery Report", "",
@@ -272,7 +276,7 @@ def discover(args: argparse.Namespace) -> None:
         report_lines.extend(f"- {warning}" for warning in warnings)
     report_lines += ["", "## Next action", "", "Run existing-content audit or create a translation job."]
     report_path = workspace / "shopify" / "discovery" / f"{discovery_id}-report.md"
-    report_path.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+    atomic_write_text(report_path, "\n".join(report_lines) + "\n")
     append_history(workspace, "shopify_discovery_completed", {
         "discovery_id": discovery_id, "store": connector.config["store"],
         "resources": sorted(requested), "counts": {

@@ -9,8 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from brandlab_lib import (
+    resolve_job_path,
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json, find_market, load_job,
-    read_json, resolve_workspace, slug, utc_now,
+    read_json, read_json_contract, resolve_workspace, slug, utc_now, validate_schema,
 )
 from mutation_lib import approval_digest, plan_digest, TRANSLATION_PLAN_TYPE
 from shopify_connector import ShopifyConnector
@@ -59,7 +61,7 @@ def build_plan(args: argparse.Namespace) -> None:
     if not shopify_locale:
         raise BrandLabError(f"{workspace / 'brand.yaml'}: market {manifest['market']} needs shopify_locale for Translation API writeback.")
     approval_path = job_dir / "approvals.json"
-    approval_state = read_json(approval_path) if approval_path.exists() else {"decisions": []}
+    approval_state = read_json_contract(approval_path, "approval-state") if approval_path.exists() else {"decisions": []}
 
     requested = set(args.ids.split(",")) if args.ids else None
     selected: list[dict[str, Any]] = []
@@ -89,8 +91,8 @@ def build_plan(args: argparse.Namespace) -> None:
     operations: list[dict[str, Any]] = []
     aliases_by_resource: dict[str, str] = {}
     for item in selected:
-        snapshot = read_json(job_dir / item["source_path"])
-        output = read_json(job_dir / item["translation_path"])
+        snapshot = read_json(resolve_job_path(job_dir, item["source_path"]))
+        output = read_json(resolve_job_path(job_dir, item["translation_path"]))
         resource_id = str(snapshot.get("shopify_resource_id") or "")
         if not resource_id.startswith("gid://shopify/"):
             rejected.append((item["item_id"], "invalid Shopify resource ID"))
@@ -156,6 +158,7 @@ def build_plan(args: argparse.Namespace) -> None:
     plan_dir = workspace / "shopify" / "translation-writeback-plans"
     plan_dir.mkdir(parents=True, exist_ok=True)
     plan_path = plan_dir / f"{batch_id}.json"
+    validate_schema("mutation-plan", plan, plan_path)
     atomic_write_json(plan_path, plan)
     lines = [
         "# Shopify Translation Writeback Plan", "",
@@ -171,7 +174,7 @@ def build_plan(args: argparse.Namespace) -> None:
         lines.append(f"| `{operation['item_id']}` | `{operation['shopify_resource_id']}` | `{operation['field']}` | {before} | {after} | `{operation['translatable_content_digest']}` |")
     lines += ["", "## Next action", "", "Review this file, then approve it separately. Execution also requires --execute."]
     review_path = plan_dir / f"{batch_id}-review.md"
-    review_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(review_path, "\n".join(lines) + "\n")
     append_history(workspace, "translation_writeback_planned", {
         "batch_id": batch_id, "job_id": args.job, "items": len(operations),
         "plan": str(plan_path.relative_to(workspace)), "review": str(review_path.relative_to(workspace)),

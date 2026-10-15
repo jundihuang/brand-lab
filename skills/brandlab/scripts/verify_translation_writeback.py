@@ -8,8 +8,9 @@ from pathlib import Path
 from typing import Any
 
 from brandlab_lib import (
-    BrandLabError, append_history, atomic_write_json, load_job, read_json,
-    resolve_workspace, save_job, utc_now,
+    atomic_write_text,
+    BrandLabError, append_history, atomic_write_json, load_job, read_json, read_json_contract,
+    resolve_workspace, save_job, utc_now, validate_schema,
 )
 from mutation_lib import load_plan, save_plan
 from shopify_connector import ShopifyConnector
@@ -35,7 +36,7 @@ def verify(args: argparse.Namespace) -> None:
     if not result_path.is_absolute():
         candidate = workspace / result_path
         result_path = candidate if candidate.exists() else result_path.expanduser().resolve()
-    result = read_json(result_path)
+    result = read_json_contract(result_path, "translation-writeback-result")
     if result.get("status") != "executed":
         raise BrandLabError(f"{result_path}: only an executed translation writeback can be verified.")
     plan_path = workspace / "shopify" / "translation-writeback-plans" / f"{result['batch_id']}.json"
@@ -65,6 +66,7 @@ def verify(args: argparse.Namespace) -> None:
     statuses = [item["status"] for item in result["items"]]
     verification_status = "failed" if "failed" in statuses else "mismatched" if "mismatched" in statuses else "verified" if statuses else "failed"
     result["status"] = verification_status
+    validate_schema("translation-writeback-result", result, result_path)
     atomic_write_json(result_path, result)
     for operation in plan["operations"]:
         operation["status"] = next((row["status"] for row in result["items"] if row["item_id"] == operation["item_id"]), operation["status"])
@@ -84,7 +86,7 @@ def verify(args: argparse.Namespace) -> None:
         readback = str(item.get("readback", "")).replace("|", "\\|").replace("\n", " ")
         lines.append(f"| `{item['item_id']}` | `{item['field']}` | {readback} | `{item['status']}` |")
     lines += ["", "This value was read back from the Shopify Translation API view.", ""]
-    summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(summary_path, "\n".join(lines) + "\n")
     append_history(workspace, "translation_writeback_verified", {
         "batch_id": result["batch_id"], "execution_id": result["execution_id"], "status": verification_status,
     })

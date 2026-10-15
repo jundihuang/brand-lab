@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["timestamp", "actor", "event_type", "payload"],
+  "properties": {
+    "timestamp": {"type": "string", "minLength": 1},
+    "actor": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "minLength": 1},
+    "payload": {"type": "object"}
+  }
+}

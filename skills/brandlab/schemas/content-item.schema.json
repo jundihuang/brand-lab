@@ -1,20 +1,64 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["id", "resource_type", "source_locale", "target_locale", "source", "digest", "status"],
+  "required": [
+    "id",
+    "resource_type",
+    "source_locale",
+    "target_locale",
+    "source",
+    "digest",
+    "status"
+  ],
   "properties": {
-    "id": {"type": "string"},
-    "external_id": {"type": "string"},
-    "source_file": {"type": "string"},
-    "resource_type": {"type": "string"},
-    "source_locale": {"type": "string"},
-    "target_locale": {"type": "string"},
-    "market": {"type": "string"},
-    "source": {"type": "string"},
-    "context": {"type": "object"},
-    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-    "status": {"enum": ["new", "changed", "unchanged", "pending", "in_job", "stale", "archived"]},
-    "imported_at": {"type": "string"},
-    "updated_at": {"type": "string"}
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "external_id": {
+      "type": "string"
+    },
+    "source_file": {
+      "type": "string"
+    },
+    "resource_type": {
+      "type": "string"
+    },
+    "source_locale": {
+      "type": "string"
+    },
+    "target_locale": {
+      "type": "string"
+    },
+    "market": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "context": {
+      "type": "object"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "new",
+        "changed",
+        "unchanged",
+        "pending",
+        "in_job",
+        "stale",
+        "archived"
+      ]
+    },
+    "imported_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
   }
 }

@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from brandlab_lib import (
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json, find_market, locale_base,
-    resolve_workspace, sha256_text, slug, utc_now, write_jsonl,
+    read_jsonl_contract, resolve_workspace, sha256_text, slug, utc_now, validate_schema, write_jsonl_contract,
 )
 from shopify_connector import ShopifyConnector
 
@@ -300,7 +301,7 @@ def discover_existing(args: argparse.Namespace) -> None:
     output_dir = workspace / 'shopify' / 'existing-translations'
     market_slug = slug(str(market_entry.get('id') or market_entry['market']))
     records_path = output_dir / f'{market_slug}.jsonl'
-    write_jsonl(records_path, records)
+    write_jsonl_contract(records_path, records, "existing-translation")
 
     source_records = sum(item['source_available'] for item in records)
     if source_records == len(records):
@@ -333,6 +334,7 @@ def discover_existing(args: argparse.Namespace) -> None:
         'warnings': warnings,
     }
     manifest_path = output_dir / f'{market_slug}-manifest.json'
+    validate_schema("existing-translation-discovery", manifest, manifest_path)
     atomic_write_json(manifest_path, manifest)
     atomic_write_json(output_dir / f'{market_slug}-latest.json', manifest)
     report = [
@@ -349,7 +351,7 @@ def discover_existing(args: argparse.Namespace) -> None:
     if warnings:
         report += ['', '## Warnings', ''] + [f'- {warning}' for warning in warnings]
     report_path = output_dir / f'{market_slug}-report.md'
-    report_path.write_text('\n'.join(report) + '\n', encoding='utf-8')
+    atomic_write_text(report_path, '\n'.join(report) + '\n')
     append_history(workspace, 'existing_translation_discovered', {
         'discovery_id': operation_id, 'market': market_entry.get('id') or market_entry['market'],
         'records': len(records), 'source_availability': availability,

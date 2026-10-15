@@ -1,31 +1,127 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type":"object",
-  "required":["audit_id","audit_mode","market","source_availability","counts","items"],
-  "properties":{
-    "audit_id":{"type":"string"},
-    "audit_mode":{"enum":["paired_source","target_only","mixed"]},
-    "market":{"type":"string"},
-    "target_locale":{"type":"string"},
-    "source_availability":{"enum":["found","not_found","mixed"]},
-    "counts":{"type":"object"},
-    "items":{
-      "type":"array",
-      "items":{
-        "type":"object",
-        "required":["item_id","audit_mode","market","source_available","status","recommendation","trust_score","checks","skipped_checks"],
-        "properties":{
-          "item_id":{"type":"string"},
-          "audit_mode":{"enum":["paired_source","target_only"]},
-          "source_available":{"type":"boolean"},
-          "source_locale":{"type":["string","null"]},
-          "source_origin":{"type":["string","null"]},
-          "status":{"enum":["pass","warning","fail","missing","source_missing"]},
-          "recommendation":{"enum":["keep","fix","retranslate","rewrite","localize","manual_review","add_reference"]},
-          "trust_score":{"type":"integer","minimum":0,"maximum":100},
-          "checks":{"type":"array"},
-          "skipped_checks":{"type":"array","items":{"type":"string"}},
-          "ai_review":{"type":["object","null"]}
+  "type": "object",
+  "required": [
+    "audit_id",
+    "audit_mode",
+    "market",
+    "source_availability",
+    "counts",
+    "items"
+  ],
+  "properties": {
+    "audit_id": {
+      "type": "string"
+    },
+    "audit_mode": {
+      "enum": [
+        "paired_source",
+        "target_only",
+        "mixed"
+      ]
+    },
+    "market": {
+      "type": "string"
+    },
+    "target_locale": {
+      "type": "string"
+    },
+    "source_availability": {
+      "enum": [
+        "found",
+        "not_found",
+        "mixed"
+      ]
+    },
+    "counts": {
+      "type": "object"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "audit_mode",
+          "market",
+          "source_available",
+          "status",
+          "recommendation",
+          "trust_score",
+          "checks",
+          "unverifiable_checks"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "audit_mode": {
+            "enum": [
+              "paired_source",
+              "target_only"
+            ]
+          },
+          "source_available": {
+            "type": "boolean"
+          },
+          "source_locale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warning",
+              "fail",
+              "missing",
+              "source_missing"
+            ]
+          },
+          "recommendation": {
+            "enum": [
+              "keep",
+              "fix",
+              "retranslate",
+              "rewrite",
+              "localize",
+              "manual_review",
+              "add_reference"
+            ]
+          },
+          "trust_score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "checks": {
+            "type": "array"
+          },
+          "skipped_checks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ai_review": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "unverifiable_checks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     }

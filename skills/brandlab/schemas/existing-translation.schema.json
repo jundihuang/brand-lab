@@ -1,26 +1,104 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["record_id","market","target_locale","resource_type","shopify_resource_id","field_key","source_available","published_text","audit_mode"],
+  "required": [
+    "record_id",
+    "market",
+    "target_locale",
+    "resource_type",
+    "shopify_resource_id",
+    "field_key",
+    "source_available",
+    "published_text",
+    "audit_mode"
+  ],
   "properties": {
-    "record_id": {"type":"string"},
-    "market": {"type":"string"},
-    "market_id": {"type":"string"},
-    "target_locale": {"type":"string"},
-    "shopify_locale": {"type":"string"},
-    "resource_type": {"type":"string"},
-    "shopify_resource_id": {"type":"string","pattern":"^gid://shopify/.+"},
-    "field_key": {"type":"string"},
-    "source_available": {"type":"boolean"},
-    "source_origin": {"enum":["shopify_base","uploaded_reference","history_job","bridge_locale","user_context","none",null]},
-    "source_locale": {"type":"string"},
-    "source_text": {"type":"string"},
-    "source_digest": {"type":["string","null"]},
-    "published_text": {"type":"string"},
-    "published_digest": {"type":["string","null"]},
-    "shopify_market_id": {"type":["string","null"]},
-    "outdated": {"type":["boolean","null"]},
-    "audit_mode": {"enum":["paired_source","target_only"]},
-    "unverifiable_checks": {"type":"array","items":{"type":"string"}}
+    "record_id": {
+      "type": "string"
+    },
+    "market": {
+      "type": "string"
+    },
+    "market_id": {
+      "type": "string"
+    },
+    "target_locale": {
+      "type": "string"
+    },
+    "shopify_locale": {
+      "type": "string"
+    },
+    "resource_type": {
+      "type": "string"
+    },
+    "shopify_resource_id": {
+      "type": "string",
+      "pattern": "^gid://shopify/.+"
+    },
+    "field_key": {
+      "type": "string"
+    },
+    "source_available": {
+      "type": "boolean"
+    },
+    "source_origin": {
+      "enum": [
+        "shopify_base",
+        "uploaded_reference",
+        "history_job",
+        "bridge_locale",
+        "user_context",
+        "none",
+        null
+      ]
+    },
+    "source_locale": {
+      "type": "string"
+    },
+    "source_text": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_digest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "published_text": {
+      "type": "string"
+    },
+    "published_digest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "shopify_market_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "outdated": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "audit_mode": {
+      "enum": [
+        "paired_source",
+        "target_only"
+      ]
+    },
+    "unverifiable_checks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
   }
 }

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "discovery_id",
+    "store",
+    "market",
+    "target_locale",
+    "shopify_locale",
+    "audit_mode",
+    "source_availability",
+    "record_count",
+    "records_path",
+    "created_at"
+  ],
+  "properties": {
+    "discovery_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "store": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market": {
+      "type": "string",
+      "minLength": 1
+    },
+    "shopify_locale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "filters": {
+      "type": "object"
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_locale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_locale": {
+      "type": "string"
+    },
+    "source_origins": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resource_type_filter": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "audit_mode": {
+      "enum": [
+        "paired_source",
+        "target_only",
+        "mixed"
+      ]
+    },
+    "source_availability": {
+      "enum": [
+        "found",
+        "not_found",
+        "mixed"
+      ]
+    },
+    "records_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_response_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "shopify_market_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from brandlab_lib import (
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json, load_brand,
-    read_json, resolve_workspace, slug, utc_now,
+    read_json, resolve_workspace, slug, utc_now, validate_schema,
 )
 
 
@@ -86,6 +87,7 @@ def build_summary(args: argparse.Namespace) -> None:
 
     summary = {"generated_at": utc_now(), "markets": markets}
     output_path = workspace / "reports" / "market-translation-summary.json"
+    validate_schema("market-summary", summary, output_path)
     atomic_write_json(output_path, summary)
     lines = [
         "# Market Translation Summary", "", f"- Generated: `{summary['generated_at']}`", "",
@@ -112,7 +114,7 @@ def build_summary(args: argparse.Namespace) -> None:
         lines.append("- No target-only audit limits are active.")
     lines += ["", "This summary reads local workspace state only; it did not call Shopify."]
     markdown_path = workspace / "reports" / "market-translation-summary.md"
-    markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(markdown_path, "\n".join(lines) + "\n")
     append_history(workspace, "market_summary_generated", {"markets": len(markets), "report": str(markdown_path.relative_to(workspace))})
     print(json.dumps({"result": "ok", "markets": len(markets), "json": str(output_path), "report": str(markdown_path)}, ensure_ascii=False))
     print("Next: open the report and prioritize warning, fail, and missing translations.")

@@ -565,6 +565,8 @@ Definition of done:
 
 ### M3.1 Schema and validation hardening
 
+Status: Completed 2026-10-15.
+
 Tasks:
 
 1. Complete JSON schemas for all persisted objects.

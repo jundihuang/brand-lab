@@ -7,7 +7,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from brandlab_lib import BrandLabError, append_history, atomic_write_text, load_job, read_json, resolve_workspace, save_job, render_audit_summary
+from brandlab_lib import resolve_job_path, BrandLabError, append_history, atomic_write_text, load_job, read_json, resolve_workspace, save_job, render_audit_summary
 
 
 def decision(checks: list[dict]) -> str:
@@ -28,15 +28,15 @@ def build_review(args: argparse.Namespace) -> None:
     for job_item in manifest["items"]:
         item_id = job_item["item_id"]
         status_counts[job_item["status"]] += 1
-        source_snapshot = read_json(job_dir / job_item["source_path"])
+        source_snapshot = read_json(resolve_job_path(job_dir, job_item["source_path"]))
         source = source_snapshot.get("source", "")
-        if (job_dir / job_item["translation_path"]).is_file():
-            translation = read_json(job_dir / job_item["translation_path"])
+        if resolve_job_path(job_dir, job_item["translation_path"]).is_file():
+            translation = read_json(resolve_job_path(job_dir, job_item["translation_path"]))
             output = translation.get("translated_text", "")
         else:
             output = ""
-        if (job_dir / job_item["audit_path"]).is_file():
-            audit = read_json(job_dir / job_item["audit_path"])
+        if resolve_job_path(job_dir, job_item["audit_path"]).is_file():
+            audit = read_json(resolve_job_path(job_dir, job_item["audit_path"]))
             checks = audit.get("checks", [])
             score = int(audit.get("trust_score", 0))
             score_total += score

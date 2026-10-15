@@ -7,10 +7,11 @@ import sys
 from pathlib import Path
 
 from brandlab_lib import (
+    resolve_job_path,
     BrandLabError, append_history, atomic_write_json, atomic_write_text,
     calculate_trust_score, item_status_from_checks, load_glossary_snapshot,
-    load_guideline_snapshots, load_job, read_json, read_jsonl, resolve_workspace, save_job,
-    utc_now, validate_translation, write_jsonl,
+    load_guideline_snapshots, load_job, read_json, read_json_contract, read_jsonl_contract, resolve_workspace, save_job,
+    utc_now, validate_schema, validate_translation, write_jsonl_contract,
 )
 
 
@@ -75,7 +76,7 @@ def prepare_translation(workspace: Path, job_dir: Path, manifest: dict) -> tuple
     for job_item in manifest["items"]:
         if job_item["status"] not in {"pending", "stale"}:
             continue
-        source = read_json(job_dir / job_item["source_path"])
+        source = read_json(resolve_job_path(job_dir, job_item["source_path"]))
         row = {
             "item_id": job_item["item_id"], "source": source.get("source", ""),
             "source_digest": job_item["source_digest"], "source_locale": manifest["source_locale"],
@@ -93,7 +94,7 @@ def prepare_translation(workspace: Path, job_dir: Path, manifest: dict) -> tuple
         worklist.append(row)
     if not worklist:
         raise BrandLabError(f"{manifest['job_id']}: no pending or stale items. Run status.py or create a new job.")
-    write_jsonl(job_dir / "worklist.jsonl", worklist)
+    write_jsonl_contract(job_dir / "worklist.jsonl", worklist, "translation-worklist")
     prompt = render_prompt(manifest, guidelines, glossary, worklist)
     atomic_write_text(job_dir / "translation-prompt.md", prompt + "\n")
     if manifest["status"] in {"ready", "review", "approved"}:
@@ -104,7 +105,7 @@ def prepare_translation(workspace: Path, job_dir: Path, manifest: dict) -> tuple
 
 
 def ingest_translations(workspace: Path, job_dir: Path, manifest: dict, input_path: Path) -> dict[str, int]:
-    records = read_jsonl(input_path)
+    records = read_jsonl_contract(input_path, "translation-output")
     if not records:
         raise BrandLabError(f"{input_path}: no translation records found. Write one JSON object per line.")
     item_by_id = {row["item_id"]: row for row in manifest["items"]}
@@ -116,7 +117,7 @@ def ingest_translations(workspace: Path, job_dir: Path, manifest: dict, input_pa
     # Preload existing outputs for duplicate warning detection.
     existing_outputs: dict[str, str] = {}
     for item in manifest["items"]:
-        path = job_dir / item["translation_path"]
+        path = resolve_job_path(job_dir, item["translation_path"])
         if item["item_id"] not in {record.get("item_id") for record in records} and path.exists():
             try:
                 existing_outputs[item["item_id"]] = read_json(path).get("translated_text", "")
@@ -145,7 +146,7 @@ def ingest_translations(workspace: Path, job_dir: Path, manifest: dict, input_pa
         for field in ("translated_text", "source_digest", "target_locale"):
             if field not in record:
                 raise BrandLabError(f"{input_path}:{line_no}: record {item_id} is missing {field}. Add the required field and retry.")
-        source_snapshot = read_json(job_dir / job_item["source_path"])
+        source_snapshot = read_json(resolve_job_path(job_dir, job_item["source_path"]))
         item_guidelines = [
             guideline for guideline in guidelines
             if guideline.get("id") in set(job_item.get("guideline_ids") or [ref["id"] for ref in manifest.get("guidelines", [])])
@@ -178,8 +179,12 @@ def ingest_translations(workspace: Path, job_dir: Path, manifest: dict, input_pa
             "notes": record.get("notes", ""), "guideline_versions": audit["guideline_versions"],
             "glossary_digest": manifest.get("glossary_digest"), "created_at": utc_now(),
         }
-        atomic_write_json(job_dir / job_item["translation_path"], output)
-        atomic_write_json(job_dir / job_item["audit_path"], audit)
+        translation_path = resolve_job_path(job_dir, job_item["translation_path"])
+        validate_schema("translation-output", output, translation_path)
+        atomic_write_json(translation_path, output)
+        audit_path = resolve_job_path(job_dir, job_item["audit_path"])
+        validate_schema("audit-result", audit, audit_path)
+        atomic_write_json(audit_path, audit)
         previous_status = job_item["status"]
         job_item["status"] = audit["status"]
         job_item["trust_score"] = audit["trust_score"]

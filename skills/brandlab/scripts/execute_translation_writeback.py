@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from brandlab_lib import (
+from brandlab_lib import (    read_json_contract,
+
     BrandLabError, append_history, atomic_write_json, load_job, read_json,
     resolve_workspace, save_job, slug, utc_now,
 )
@@ -98,7 +99,7 @@ def execute(args: argparse.Namespace) -> int:
         print("Next: add --execute to perform this approved Shopify Translation API batch.")
         return 0
     job_dir, manifest = load_job(workspace, plan["job_id"])
-    approval_state = read_json(job_dir / "approvals.json") if (job_dir / "approvals.json").exists() else {"decisions": []}
+    approval_state = read_json_contract(job_dir / "approvals.json", "approval-state") if (job_dir / "approvals.json").exists() else {"decisions": []}
     decisions = {row.get("item_id"): row for row in approval_state.get("decisions", []) if isinstance(row, dict)}
     for operation in plan["operations"]:
         job_item = next((row for row in manifest["items"] if row["item_id"] == operation["item_id"]), None)

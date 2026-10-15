@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 from brandlab_lib import (
+    resolve_job_path,
     BrandLabError, append_history, atomic_write_json, calculate_trust_score,
     item_status_from_checks, load_glossary_snapshot, load_guideline_snapshots,
-    load_job, read_json, resolve_workspace, save_job, utc_now, validate_translation,
+    load_job, read_json, read_json_contract, resolve_workspace, save_job, utc_now, validate_schema, validate_translation,
 )
 
 
@@ -20,7 +21,7 @@ def revalidate(args: argparse.Namespace) -> None:
     glossary = load_glossary_snapshot(job_dir)
     outputs: dict[str, str] = {}
     for item in manifest["items"]:
-        path = job_dir / item["translation_path"]
+        path = resolve_job_path(job_dir, item["translation_path"])
         if path.exists():
             outputs[item["item_id"]] = str(read_json(path).get("translated_text", ""))
     selected = manifest["items"]
@@ -31,11 +32,11 @@ def revalidate(args: argparse.Namespace) -> None:
             raise BrandLabError(f"--item-id: no matching item in job {args.job}.")
     updated = 0
     for job_item in selected:
-        translation_path = job_dir / job_item["translation_path"]
+        translation_path = resolve_job_path(job_dir, job_item["translation_path"])
         if not translation_path.exists():
             raise BrandLabError(f"{translation_path}: translation missing. Run translate_job.py first.")
-        translation = read_json(translation_path)
-        source = read_json(job_dir / job_item["source_path"])
+        translation = read_json_contract(translation_path, "translation-output")
+        source = read_json(resolve_job_path(job_dir, job_item["source_path"]))
         item_guidelines = [
             guideline for guideline in guidelines
             if guideline.get("id") in set(job_item.get("guideline_ids") or [])
@@ -55,7 +56,9 @@ def revalidate(args: argparse.Namespace) -> None:
             "guideline_versions": {g["id"]: g.get("version") for g in item_guidelines},
             "glossary_digest": manifest.get("glossary_digest"), "checks": checks, "validated_at": utc_now(),
         }
-        atomic_write_json(job_dir / job_item["audit_path"], audit)
+        audit_path = resolve_job_path(job_dir, job_item["audit_path"])
+        validate_schema("audit-result", audit, audit_path)
+        atomic_write_json(audit_path, audit)
         previous = job_item["status"]
         job_item["status"] = audit["status"]
         job_item["trust_score"] = audit["trust_score"]

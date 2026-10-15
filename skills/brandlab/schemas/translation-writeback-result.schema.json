@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "execution_id",
+    "batch_id",
+    "status",
+    "created_at",
+    "raw_output_path",
+    "items"
+  ],
+  "properties": {
+    "execution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "executed",
+        "failed",
+        "verified",
+        "mismatched"
+      ]
+    },
+    "store": {
+      "type": "string",
+      "minLength": 1
+    },
+    "shopify_locale": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_output_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command_record_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "shopify_resource_id",
+          "field",
+          "after",
+          "status"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "shopify_resource_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "shopify_market_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "after": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "success",
+              "failed",
+              "verified",
+              "mismatched"
+            ]
+          },
+          "readback": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_errors": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "message": {
+      "type": "string"
+    }
+  }
+}

@@ -10,8 +10,9 @@ from typing import Any
 import yaml
 
 from brandlab_lib import (
+    atomic_write_text,
     BrandLabError, append_history, atomic_write_json, locale_base, load_brand,
-    read_catalog, resolve_workspace, slug, utc_now,
+    read_catalog, resolve_workspace, slug, utc_now, validate_schema,
 )
 from shopify_connector import ShopifyConnector
 
@@ -168,6 +169,7 @@ def onboard(args: argparse.Namespace) -> None:
     onboarding_id = f"market-onboarding-{slug(market_key)}-{utc_now()[:10]}"
     report = {
         "onboarding_id": onboarding_id, "created_at": utc_now(), "market": market_key,
+        "status": "ready" if args.confirm_update else "planned",
         "target_locale": target_locale, "shopify_locale": shopify_locale,
         "source_language": brand["source_language"], "translation_mode": plan["append_market"]["translation_mode"],
         "config_updated": bool(args.confirm_update), "checks": checks,
@@ -183,6 +185,7 @@ def onboard(args: argparse.Namespace) -> None:
     }
     output_dir = workspace / "onboarding"
     output_dir.mkdir(parents=True, exist_ok=True)
+    validate_schema("market-onboarding", report, output_dir / f"{onboarding_id}.json")
     atomic_write_json(output_dir / f"{onboarding_id}.json", report)
 
     yaml_market = json.loads(json.dumps(plan["append_market"]))
@@ -204,7 +207,7 @@ def onboard(args: argparse.Namespace) -> None:
         "Review this plan. Say “confirm this market onboarding” to apply the brand.yaml update; guideline and glossary edits remain explicit follow-up tasks." if not args.confirm_update else "The market registry update was applied. Run content scan or market audit next.",
     ]
     report_path = output_dir / f"{onboarding_id}.md"
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(report_path, "\n".join(lines) + "\n")
 
     if args.confirm_update:
         config_path = workspace / "brand.yaml"
@@ -213,7 +216,7 @@ def onboard(args: argparse.Namespace) -> None:
             raise BrandLabError(f"{config_path}: brand.yaml must contain a YAML object.")
         value.setdefault("markets", []).append(yaml_market)
         value.setdefault("source", {}).update(yaml_source)
-        config_path.write_text(yaml.safe_dump(value, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        atomic_write_text(config_path, yaml.safe_dump(value, allow_unicode=True, sort_keys=False))
 
     append_history(workspace, "market_onboarding_planned", {
         "onboarding_id": onboarding_id, "market": market_key, "target_locale": target_locale,

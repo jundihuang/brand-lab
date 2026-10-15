@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["generated_at", "markets"],
+  "properties": {
+    "generated_at": {"type": "string", "minLength": 1},
+    "markets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["market", "locale", "discovery", "audit", "jobs", "writeback_plans"],
+        "properties": {
+          "market": {"type": "string", "minLength": 1},
+          "locale": {"type": "string", "minLength": 1},
+          "shopify_locale": {"type": "string"},
+          "translation_mode": {"type": "string"},
+          "audit_mode": {"type": "string"},
+          "discovery": {"type": "object"},
+          "audit": {"type": "object"},
+          "ai_review": {"type": "object"},
+          "jobs": {"type": "array", "items": {"type": "object"}},
+          "writeback_plans": {"type": "array", "items": {"type": "object"}}
+        }
+      }
+    }
+  }
+}

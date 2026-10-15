@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "state", "resource_type", "source_locale", "target_locale", "digest"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "state": {"enum": ["new", "changed", "unchanged"]},
+    "file": {"type": "string"},
+    "resource_type": {"type": "string", "minLength": 1},
+    "source_locale": {"type": "string", "minLength": 1},
+    "target_locale": {"type": "string", "minLength": 1},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from brandlab_lib import BrandLabError, read_json, sha256_text
+from brandlab_lib import BrandLabError, atomic_write_json, read_json, sha256_text
+from brandlab_lib import validate_schema
 
 
 PRODUCT_FIELD_MAP = {
@@ -54,12 +55,14 @@ def load_plan(path: Path) -> dict[str, Any]:
         raise BrandLabError(f"{path}: operation count exceeds max_batch_size.")
     if not isinstance(plan["graphql"], dict) or not isinstance(plan["graphql"].get("query"), str):
         raise BrandLabError(f"{path}: graphql.query is required.")
+    validate_schema("mutation-plan", plan, path)
     return plan
 
 
 def save_plan(path: Path, plan: dict[str, Any]) -> None:
     from brandlab_lib import atomic_write_json
     plan["updated_at"] = utc_now_safe()
+    validate_schema("mutation-plan", plan, path)
     atomic_write_json(path, plan)
 
 

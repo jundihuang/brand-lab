@@ -30,6 +30,30 @@ Never delete `history/events.jsonl`.
 
 ## Import and validation issues
 
+### `SCHEMA_INVALID`
+
+The message identifies the file, JSON path, failed rule, and repair hint.
+
+1. Open the reported file and field.
+2. Correct the value to the expected type or allowed value.
+3. Re-run the command that produced it.
+
+For JSONL, the message contains `FILE:LINE`. Back up the file, repair only that line, and re-run the workflow. Do not delete history.
+
+Example:
+
+```text
+[SCHEMA_INVALID] brandlab/brand.yaml: $.mode: 'unsupported' is not one of ['pure', 'shopify_controlled']. Fix: Use one of the allowed values.
+```
+
+### `[PATH_INVALID]`
+
+A path is absolute or escapes its workspace/job root.
+
+1. Replace it with a path relative to the reported root.
+2. Remove `..`, leading `/`, and another store/job's path.
+3. Re-run the workflow.
+
 ### CSV is not imported as expected
 
 1. Confirm UTF-8 encoding.

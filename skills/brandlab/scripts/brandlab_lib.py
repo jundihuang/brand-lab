@@ -18,6 +18,13 @@ from typing import Any, Iterable
 
 import yaml
 
+from validation_lib import (
+    SchemaValidationError,
+    resolve_inside as resolve_inside_unsafe,
+    validate_row_schema as validate_row_schema_unsafe,
+    validate_schema as validate_schema_unsafe,
+)
+
 
 SUPPORTED_MODES = {"pure", "shopify_controlled"}
 SUPPORTED_RESOURCE_TYPES = {
@@ -33,12 +40,33 @@ AUDIT_POLICIES = {"standard", "seo_and_legal", "custom"}
 AUDIT_MODES = {"auto", "paired_source", "target_only"}
 JOB_ITEM_STATUSES = {
     "pending", "translated", "needs_review", "approved", "rejected",
-    "blocked", "exported", "stale",
+    "blocked", "exported", "stale", "verified", "mismatched",
 }
 
 
 class BrandLabError(Exception):
     """User-facing error. Message must identify file, field, reason, and fix."""
+
+
+def validate_schema(name: str, value: Any, path: Path | str) -> None:
+    try:
+        validate_schema_unsafe(name, value, path)
+    except SchemaValidationError as exc:
+        raise BrandLabError(str(exc)) from exc
+
+
+def validate_row_schema(name: str, row: Any, path: Path | str, line_no: int) -> None:
+    try:
+        validate_row_schema_unsafe(name, row, path, line_no)
+    except SchemaValidationError as exc:
+        raise BrandLabError(str(exc)) from exc
+
+
+def resolve_inside(root: Path, relative: Path | str) -> Path:
+    try:
+        return resolve_inside_unsafe(root, relative)
+    except SchemaValidationError as exc:
+        raise BrandLabError(str(exc)) from exc
 
 
 def utc_now() -> str:
@@ -76,6 +104,30 @@ def atomic_write_text(path: Path, content: str) -> None:
 
 def atomic_write_json(path: Path, value: Any) -> None:
     atomic_write_text(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+
+
+def read_json_contract(path: Path, schema_name: str) -> Any:
+    value = read_json(path)
+    validate_schema(schema_name, value, path)
+    return value
+
+
+def write_json_contract(path: Path, value: Any, schema_name: str) -> None:
+    validate_schema(schema_name, value, path)
+    atomic_write_json(path, value)
+
+
+def read_jsonl_contract(path: Path, schema_name: str) -> list[dict[str, Any]]:
+    rows = read_jsonl(path)
+    for line_no, row in enumerate(rows, 1):
+        validate_row_schema(schema_name, row, path, line_no)
+    return rows
+
+
+def write_jsonl_contract(path: Path, rows: Iterable[dict[str, Any]], schema_name: str) -> None:
+    for line_no, row in enumerate(rows, 1):
+        validate_row_schema(schema_name, row, path, line_no)
+    write_jsonl(path, rows)
 
 
 def read_json(path: Path) -> Any:
@@ -134,6 +186,10 @@ def workspace_path(workspace: Path, *parts: str) -> Path:
     return workspace.joinpath(*parts)
 
 
+def resolve_job_path(job_dir: Path, relative: Path | str) -> Path:
+    return resolve_inside(job_dir, relative)
+
+
 def load_yaml(path: Path) -> Any:
     try:
         with path.open("r", encoding="utf-8") as handle:
@@ -148,8 +204,9 @@ def append_history(workspace: Path, event_type: str, payload: dict[str, Any]) ->
     history_path = workspace / "history" / "events.jsonl"
     history_path.parent.mkdir(parents=True, exist_ok=True)
     event = {"timestamp": utc_now(), "actor": "brandlab-skill", "event_type": event_type, "payload": payload}
-    with history_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+    validate_schema("history-event", event, history_path)
+    rows = read_jsonl(history_path) + [event]
+    write_jsonl(history_path, rows)
 
 
 def normalize_market_registry(brand: dict[str, Any], config_path: Path) -> dict[str, Any]:
@@ -226,13 +283,16 @@ def load_brand(workspace: Path) -> dict[str, Any]:
     brand = load_yaml(config_path)
     if not isinstance(brand, dict):
         raise BrandLabError(f"{config_path}: top level must be a mapping.")
+    validate_schema("brand", brand, config_path)
     required = ("brand", "mode", "source_language", "working_language", "markets")
     missing = [field for field in required if field not in brand]
     if missing:
         raise BrandLabError(f"{config_path}: missing fields {missing}. Add them and retry.")
     if brand["mode"] not in SUPPORTED_MODES:
         raise BrandLabError(f"{config_path}: mode must be one of {sorted(SUPPORTED_MODES)}.")
-    return normalize_market_registry(brand, config_path)
+    normalized = normalize_market_registry(brand, config_path)
+    validate_schema("brand", normalized, config_path)
+    return normalized
 
 
 def find_market(brand: dict[str, Any], market_id: str) -> dict[str, Any]:
@@ -270,6 +330,7 @@ def load_guidelines(workspace: Path) -> list[tuple[Path, dict[str, Any]]]:
             raise BrandLabError(f"{path}: guideline is missing {missing}. Add the fields and retry.")
         if not isinstance(value["rules"], list):
             raise BrandLabError(f"{path}: rules must be a list.")
+        validate_schema("guideline", value, path)
         result.append((path, value))
     return result
 
@@ -306,6 +367,7 @@ def read_glossary(path: Path) -> list[dict[str, str]]:
             raise BrandLabError(f"{path}:{line_no}: glossary row is missing {missing}.")
         if row["status"] not in {"locked", "preferred", "forbidden", "draft"}:
             raise BrandLabError(f"{path}:{line_no}: status must be locked, preferred, forbidden, or draft.")
+        validate_row_schema("glossary", row, path, line_no)
     return rows
 
 
@@ -319,27 +381,43 @@ def glossary_digest(rows: list[dict[str, Any]]) -> str:
 
 
 def read_catalog(workspace: Path) -> list[dict[str, Any]]:
-    return read_jsonl(workspace / "content" / "catalog.jsonl")
+    path = workspace / "content" / "catalog.jsonl"
+    rows = read_jsonl(path)
+    for line_no, row in enumerate(rows, 1):
+        try:
+            validate_schema("content-item", row, f"{path}:{line_no}")
+        except BrandLabError as exc:
+            raise BrandLabError(str(exc).replace("SCHEMA_INVALID", f"SCHEMA_INVALID line {line_no}")) from exc
+    return rows
 
 
 def write_catalog(workspace: Path, rows: list[dict[str, Any]]) -> None:
-    write_jsonl(workspace / "content" / "catalog.jsonl", rows)
+    path = workspace / "content" / "catalog.jsonl"
+    for line_no, row in enumerate(rows, 1):
+        validate_schema("content-item", row, f"{path}:{line_no}")
+    write_jsonl(path, rows)
 
 
 def load_job(workspace: Path, job_id: str) -> tuple[Path, dict[str, Any]]:
-    job_dir = workspace / "jobs" / job_id
-    manifest_path = job_dir / "manifest.json"
+    jobs_root = workspace / "jobs"
+    safe_job_dir = resolve_inside(jobs_root, job_id)
+    if safe_job_dir.name != Path(job_id).name:
+        raise BrandLabError(f"job '{job_id}': invalid job id. Use a single folder name without path separators.")
+    manifest_path = safe_job_dir / "manifest.json"
     if not manifest_path.is_file():
         raise BrandLabError(f"{manifest_path}: job not found. Run status.py to list valid jobs.")
     value = read_json(manifest_path)
-    if not isinstance(value, dict) or value.get("job_id") != job_id:
+    if not isinstance(value, dict) or value.get("job_id") != Path(job_id).name:
         raise BrandLabError(f"{manifest_path}: manifest job_id does not match its folder name.")
-    return job_dir, value
+    validate_schema("job", value, manifest_path)
+    return safe_job_dir, value
 
 
 def save_job(job_dir: Path, manifest: dict[str, Any]) -> None:
+    manifest_path = job_dir / "manifest.json"
     manifest["updated_at"] = utc_now()
-    atomic_write_json(job_dir / "manifest.json", manifest)
+    validate_schema("job", manifest, manifest_path)
+    atomic_write_json(manifest_path, manifest)
 
 
 def load_guideline_snapshots(job_dir: Path, manifest: dict[str, Any]) -> list[dict[str, Any]]:

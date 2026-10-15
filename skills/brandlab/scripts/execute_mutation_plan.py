@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 from brandlab_lib import (
-    BrandLabError, append_history, atomic_write_json, load_job, read_json,
-    resolve_workspace, save_job, slug, utc_now,
+    BrandLabError, append_history, atomic_write_json, load_job, read_json, read_json_contract,
+    resolve_workspace, save_job, slug, utc_now, validate_schema,
 )
 from mutation_lib import approval_digest, load_plan, plan_digest, save_plan
 from shopify_connector import ShopifyConnector
@@ -16,6 +16,7 @@ from shopify_connector import ShopifyConnector
 
 def save_result(workspace: Path, result: dict) -> Path:
     path = workspace / "shopify" / "execution-results" / f"{result['execution_id']}.json"
+    validate_schema("execution-result", result, path)
     atomic_write_json(path, result)
     return path
 
@@ -76,7 +77,7 @@ def execute(args: argparse.Namespace) -> int:
 
     job_dir, manifest = load_job(workspace, plan["job_id"])
     approval_path = job_dir / "approvals.json"
-    approval_state = read_json(approval_path) if approval_path.exists() else {"decisions": []}
+    approval_state = read_json_contract(approval_path, "approval-state") if approval_path.exists() else {"decisions": []}
     job_items = {item["item_id"]: item for item in manifest["items"]}
     for operation in plan["operations"]:
         job_item = job_items.get(operation["item_id"])

@@ -11,9 +11,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from brandlab_lib import (
+from brandlab_lib import (    atomic_write_json,
+
+    resolve_job_path,
     BrandLabError, append_history, atomic_write_text, load_job, read_json,
-    resolve_workspace, save_job, sha256_text, slug, utc_now, write_jsonl,
+    resolve_workspace, save_job, sha256_text, slug, utc_now, validate_schema, write_jsonl,
 )
 
 
@@ -124,8 +126,8 @@ def export(args: argparse.Namespace) -> None:
 
     prepared = []
     for item in selected:
-        translation = read_json(job_dir / item["translation_path"])
-        source = read_json(job_dir / item["source_path"])
+        translation = read_json(resolve_job_path(job_dir, item["translation_path"]))
+        source = read_json(resolve_job_path(job_dir, item["source_path"]))
         if translation.get("source_digest") != item["source_digest"]:
             raise BrandLabError(f"export: item {item['item_id']} digest changed. Revalidate before export.")
         prepared.append((item, source, translation))
@@ -161,7 +163,8 @@ def export(args: argparse.Namespace) -> None:
         "content_digest": sha256_text(canonical),
         "item_ids": [item["item_id"] for item, _, _ in prepared],
     }
-    atomic_write_text(manifest_path, json.dumps(export_manifest, ensure_ascii=False, indent=2) + "\n")
+    validate_schema("export-manifest", export_manifest, manifest_path)
+    atomic_write_json(manifest_path, export_manifest)
 
     for item in manifest["items"]:
         if item["item_id"] in {entry[0]["item_id"] for entry in prepared}:

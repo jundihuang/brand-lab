@@ -118,7 +118,7 @@ def initialize(args: argparse.Namespace) -> None:
             skipped.append(str(destination.relative_to(workspace)))
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            atomic_write_text(destination, source.read_text(encoding="utf-8"))
             created.append(str(destination.relative_to(workspace)))
 
     catalog = workspace / "content" / "catalog.jsonl"
