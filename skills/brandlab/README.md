@@ -1,5 +1,7 @@
 # BrandLab 翻译助手
 
+当前版本：v0.3.0。
+
 BrandLab 帮助运营人员在 Codex 里翻译品牌内容。它会应用品牌规则和术语表，自动检查常见问题，生成人工审核文件，并且只导出或写回你明确批准的内容。
 
 ## 你可以对 Codex 说
@@ -178,3 +180,9 @@ BrandLab 会先给出一份新增市场计划，包括：
 ```
 
 Shopify 安装和授权说明见 `docs/SHOPIFY-SETUP.md`。
+
+更多说明：
+
+- 完整流程见 `docs/WORKFLOWS.md`
+- 文件格式见 `docs/FILE-CONTRACTS.md`
+- 常见问题见 `docs/TROUBLESHOOTING.md`
