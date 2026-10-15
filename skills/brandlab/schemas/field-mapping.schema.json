@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "import_csv": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "product_title", "product_description", "product_variant", "collection_title",
+          "collection_description", "page_title", "page_body", "blog_title", "blog_body",
+          "seo_title", "seo_description", "care_and_compliance"
+        ]
+      }
+    },
+    "export_shopify": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    }
+  }
+}

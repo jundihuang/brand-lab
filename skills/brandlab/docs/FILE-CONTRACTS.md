@@ -72,6 +72,26 @@ Path: `glossary/glossary.csv`
 
 The active glossary digest is recorded with translations and audits.
 
+## CSV field mappings
+
+Path: `field-mappings.yaml`
+
+This file is optional. Use it when source columns are not standard Shopify-style headers, or when the Shopify product CSV output needs localized/custom field names.
+
+```yaml
+import_csv:
+  Titolo: product_title
+  Descrizione: product_description
+
+export_shopify:
+  product_title: Title
+  product_description: Body (HTML)
+  seo_title: SEO Title
+  seo_description: SEO Description
+```
+
+Import and export scripts merge this file with built-in defaults. `Handle`, `Target Locale`, `BrandLab Item IDs`, and `Source Digests` are reserved Shopify export fields.
+
 ## Content catalog
 
 Path: `content/catalog.jsonl`

@@ -35,6 +35,28 @@ SUPPORTED_RESOURCE_TYPES = {
     "care_and_compliance",
 }
 ACTIONABLE_CATALOG_STATUSES = {"new", "changed", "unchanged", "pending"}
+DEFAULT_CSV_IMPORT_MAPPINGS = {
+    "title": "product_title",
+    "product title": "product_title",
+    "body html": "product_description",
+    "body": "product_description",
+    "seo title": "seo_title",
+    "seo description": "seo_description",
+    "collection title": "collection_title",
+    "collection description": "collection_description",
+    "page title": "page_title",
+    "page body": "page_body",
+    "blog title": "blog_title",
+    "blog body": "blog_body",
+}
+GENERIC_CSV_SOURCE_COLUMNS = {"source", "translation", "translation source", "translated text"}
+DEFAULT_SHOPIFY_EXPORT_FIELD_MAPPINGS = {
+    "product_title": "Title",
+    "product_description": "Body (HTML)",
+    "seo_title": "SEO Title",
+    "seo_description": "SEO Description",
+}
+SHOPIFY_REQUIRED_EXPORT_FIELDS = {"Handle", "Target Locale", "BrandLab Item IDs", "Source Digests"}
 SOURCE_STRATEGIES = {"base", "bridge", "existing_translation"}
 TRANSLATION_MODES = {"translation", "localization_only", "manual_only"}
 AUDIT_POLICIES = {"standard", "seo_and_legal", "custom"}
@@ -145,17 +167,20 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     rows: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8-sig") as handle:
-        for line_no, line in enumerate(handle, 1):
-            if not line.strip():
-                continue
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise BrandLabError(f"{path}:{line_no}: invalid JSONL. Put one JSON object on each line.") from exc
-            if not isinstance(value, dict):
-                raise BrandLabError(f"{path}:{line_no}: each JSONL row must be an object.")
-            rows.append(value)
+    try:
+        with path.open("r", encoding="utf-8-sig") as handle:
+            for line_no, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                try:
+                    value = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise BrandLabError(f"{path}:{line_no}: invalid JSONL. Put one JSON object on each line.") from exc
+                if not isinstance(value, dict):
+                    raise BrandLabError(f"{path}:{line_no}: each JSONL row must be an object.")
+                rows.append(value)
+    except UnicodeError as exc:
+        raise BrandLabError(f"{path}: file is not valid UTF-8. Re-export it as UTF-8 or UTF-8 with BOM.") from exc
     return rows
 
 
@@ -167,11 +192,31 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 def read_csv_rows(path: Path) -> list[dict[str, str]]:
     try:
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
-            return [{k: (v or "") for k, v in row.items()} for row in csv.DictReader(handle)]
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                return []
+            headers = [str(value) for value in reader.fieldnames]
+            duplicates = sorted({value for value in headers if headers.count(value) > 1})
+            if duplicates:
+                raise BrandLabError(
+                    f"{path}: duplicate CSV headers {duplicates}. Rename each column so mappings are unambiguous."
+                )
+            return [{k: (v or "") for k, v in row.items()} for row in reader]
     except FileNotFoundError as exc:
         raise BrandLabError(f"{path}: file not found. Put the source file in inbox/ or correct --file.") from exc
+    except UnicodeError as exc:
+        raise BrandLabError(f"{path}: file is not valid UTF-8. Re-export it as UTF-8 or UTF-8 with BOM.") from exc
     except csv.Error as exc:
-        raise BrandLabError(f"{path}: invalid CSV. Check quoting, encoding, and line breaks.") from exc
+        raise BrandLabError(f"{path}: invalid CSV at record {exc.lineno}. Check quoting, encoding, and line breaks.") from exc
+
+
+def read_text_utf8(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8-sig")
+    except FileNotFoundError as exc:
+        raise BrandLabError(f"{path}: file not found. Put the source file in inbox/ or correct --file.") from exc
+    except UnicodeError as exc:
+        raise BrandLabError(f"{path}: file is not valid UTF-8. Re-export it as UTF-8 or UTF-8 with BOM.") from exc
 
 
 def resolve_workspace(workspace: Path) -> Path:
@@ -538,6 +583,57 @@ def load_glossary_snapshot(job_dir: Path) -> list[dict[str, str]]:
 
 def normalize_term(value: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", value, flags=re.UNICODE)).casefold().strip()
+
+
+def normalized_csv_header(value: str) -> str:
+    return re.sub(r"[\s_()\-]+", " ", value.strip()).casefold().strip()
+
+
+def load_field_mappings(path: Path, explicit: bool = False) -> dict[str, dict[str, str]]:
+    """Load optional CSV mapping overrides and merge them with deterministic defaults."""
+    if not path.exists():
+        if explicit:
+            raise BrandLabError(f"{path}: field mapping file not found. Create it or omit --field-mapping.")
+        return {
+            "import_csv": dict(DEFAULT_CSV_IMPORT_MAPPINGS),
+            "export_shopify": dict(DEFAULT_SHOPIFY_EXPORT_FIELD_MAPPINGS),
+        }
+    value = load_yaml(path)
+    if not isinstance(value, dict):
+        raise BrandLabError(f"{path}: field mappings must be a YAML mapping.")
+    validate_schema("field-mapping", value, path)
+
+    import_mappings = dict(DEFAULT_CSV_IMPORT_MAPPINGS)
+    for raw_column, resource_type in value.get("import_csv", {}).items():
+        column = normalized_csv_header(str(raw_column))
+        if not column:
+            raise BrandLabError(f"{path}: import_csv contains an empty column name.")
+        if column in import_mappings and import_mappings[column] != resource_type:
+            raise BrandLabError(
+                f"{path}: import_csv['{raw_column}'] conflicts with default mapping "
+                f"'{import_mappings[column]}'. Use one resource type per column."
+            )
+        import_mappings[column] = str(resource_type)
+    export_mappings = dict(DEFAULT_SHOPIFY_EXPORT_FIELD_MAPPINGS)
+    for resource_type, raw_field in value.get("export_shopify", {}).items():
+        if resource_type not in export_mappings:
+            raise BrandLabError(
+                f"{path}: export_shopify['{resource_type}'] is unsupported. "
+                f"Use one of {sorted(export_mappings)}."
+            )
+        field = str(raw_field).strip()
+        if not field:
+            raise BrandLabError(f"{path}: export_shopify['{resource_type}'] cannot be empty.")
+        if field in SHOPIFY_REQUIRED_EXPORT_FIELDS:
+            raise BrandLabError(f"{path}: export_shopify['{resource_type}'] uses reserved field '{field}'. Choose a different field name.")
+        export_mappings[str(resource_type)] = field
+    duplicate_fields = sorted({
+        field for field in export_mappings.values()
+        if sum(1 for mapped in export_mappings.values() if mapped == field) > 1
+    })
+    if duplicate_fields:
+        raise BrandLabError(f"{path}: export_shopify maps multiple resources to fields {duplicate_fields}. Keep one field per resource.")
+    return {"import_csv": import_mappings, "export_shopify": export_mappings}
 
 
 LANGUAGE_MARKERS = {

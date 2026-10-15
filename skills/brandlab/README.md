@@ -55,6 +55,14 @@ brandlab/jobs/<任务ID>/review.md
 brandlab/exports/
 ```
 
+如果 CSV 列名不是常见英文格式，可以把列名对照规则放到：
+
+```text
+brandlab/field-mappings.yaml
+```
+
+Shopify 导出列名也可以用同一个文件调整。不确定格式时，把文件和表头发给 Codex，让 BrandLab 先检查。
+
 ## Shopify 回写
 
 BrandLab 可以读取 Shopify 商品内容，并把批准后的翻译写回商品。已有市场翻译修复会使用 Shopify Translation API，按市场和语言写入，不会覆盖商品默认字段。

@@ -11,11 +11,14 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from brandlab_lib import (    atomic_write_json,
-
+from brandlab_lib import (
+    atomic_write_json,
+    DEFAULT_SHOPIFY_EXPORT_FIELD_MAPPINGS,
+    load_field_mappings,
     resolve_job_path,
     BrandLabError, append_history, atomic_write_text, load_job, read_json,
-    resolve_workspace, save_job, sha256_text, slug, utc_now, validate_schema, write_jsonl,
+    resolve_workspace, save_job, sha256_text, slug, utc_now, validate_schema,
+    SHOPIFY_REQUIRED_EXPORT_FIELDS,
 )
 
 
@@ -49,40 +52,63 @@ def csv_content(rows: list[dict[str, str]], fieldnames: list[str]) -> str:
     return buffer.getvalue()
 
 
-def shopify_rows(items: list[tuple[dict, dict, dict]]) -> list[dict[str, str]]:
+def validate_shopify_export(items: list[tuple[dict, dict, dict]], field_mappings: dict[str, str]) -> list[str]:
+    """Validate every Shopify row before creating an output file."""
+    errors: list[str] = []
+    for item, source, translation in items:
+        item_id = item["item_id"]
+        resource = str(source.get("resource_type", ""))
+        if resource not in field_mappings:
+            errors.append(
+                f"{item_id}: resource_type '{resource}' is not exportable as Shopify product CSV. "
+                "Use --ids to select product/SEO resources or --format csv."
+            )
+            continue
+        if not str(source.get("external_id", "")).strip():
+            errors.append(f"{item_id}: Handle is missing. Add external_id to the imported source.")
+        if not str(translation.get("translated_text", "")).strip():
+            errors.append(f"{item_id}: Translation is empty. Re-ingest a non-empty approved translation.")
+        if not str(translation.get("target_locale", "")).strip():
+            errors.append(f"{item_id}: Target Locale is missing. Recreate the translation output.")
+    if items and not errors:
+        handles = [str(source.get("external_id", "")) for _, source, _ in items]
+        empty_handles = sum(not handle.strip() for handle in handles)
+        if empty_handles:
+            errors.append(f"Shopify CSV: {empty_handles} rows have an empty Handle.")
+    if errors:
+        raise BrandLabError("export: Shopify CSV validation failed. Fix: " + " | ".join(errors))
+    return ["Handle", *field_mappings.values(), "Target Locale", "BrandLab Item IDs", "Source Digests"]
+
+
+def shopify_rows(items: list[tuple[dict, dict, dict]], field_mappings: dict[str, str] | None = None) -> list[dict[str, str]]:
+    fields = field_mappings or DEFAULT_SHOPIFY_EXPORT_FIELD_MAPPINGS
     grouped: dict[str, dict[str, str]] = {}
     order: list[str] = []
     for item, source, translation in items:
         handle = str(source.get("external_id") or item["item_id"])
         if handle not in grouped:
             grouped[handle] = {
-                "Handle": handle, "Title": "", "Body (HTML)": "", "SEO Title": "", "SEO Description": "",
+                "Handle": handle, **{field: "" for field in fields.values()},
                 "BrandLab Item IDs": "", "Source Digests": "", "Target Locale": translation["target_locale"],
             }
             order.append(handle)
         row = grouped[handle]
         resource = source.get("resource_type")
-        if resource == "product_title":
-            row["Title"] = translation["translated_text"]
-        elif resource == "product_description":
-            row["Body (HTML)"] = translation["translated_text"]
-        elif resource == "seo_title":
-            row["SEO Title"] = translation["translated_text"]
-        elif resource == "seo_description":
-            row["SEO Description"] = translation["translated_text"]
+        row[fields[resource]] = translation["translated_text"]
         row["BrandLab Item IDs"] = ", ".join(value for value in [row["BrandLab Item IDs"], item["item_id"]] if value)
         row["Source Digests"] = ", ".join(value for value in [row["Source Digests"], item["source_digest"]] if value)
     return [grouped[handle] for handle in order]
 
 
-def build_output(items: list[tuple[dict, dict, dict]], fmt: str) -> tuple[str, str, list[str]]:
+def build_output(items: list[tuple[dict, dict, dict]], fmt: str, field_mappings: dict[str, str] | None = None) -> tuple[str, str, list[str]]:
     if fmt == "csv":
         rows = [generic_row(item, source, translation) for item, source, translation in items]
         fields = ["Item ID", "Resource Type", "Handle", "Source Locale", "Target Locale", "Original", "Translation", "Source Digest", "Approved At", "Reviewer"]
         return csv_content(rows, fields), ".csv", fields
     if fmt == "shopify_csv":
-        rows = shopify_rows(items)
-        fields = ["Handle", "Title", "Body (HTML)", "SEO Title", "SEO Description", "Target Locale", "BrandLab Item IDs", "Source Digests"]
+        rows = shopify_rows(items, field_mappings)
+        mappings = field_mappings or DEFAULT_SHOPIFY_EXPORT_FIELD_MAPPINGS
+        fields = ["Handle", *mappings.values(), "Target Locale", "BrandLab Item IDs", "Source Digests"]
         return csv_content(rows, fields), ".csv", fields
     if fmt == "json":
         records = [generic_row(item, source, translation) for item, source, translation in items]
@@ -110,6 +136,8 @@ def export(args: argparse.Namespace) -> None:
     job_dir, manifest = load_job(workspace, args.job)
     if manifest.get("mode") not in {"pure", "shopify_controlled"}:
         raise BrandLabError(f"{job_dir / 'manifest.json'}: unsupported job mode {manifest.get('mode')}.")
+    mapping_path = Path(args.field_mapping).expanduser() if args.field_mapping else workspace / "field-mappings.yaml"
+    field_mappings = load_field_mappings(mapping_path, explicit=bool(args.field_mapping))["export_shopify"]
     selected = []
     for item in manifest["items"]:
         if args.ids:
@@ -132,7 +160,8 @@ def export(args: argparse.Namespace) -> None:
             raise BrandLabError(f"export: item {item['item_id']} digest changed. Revalidate before export.")
         prepared.append((item, source, translation))
 
-    content, suffix, fields = build_output(prepared, args.format)
+    fields = validate_shopify_export(prepared, field_mappings) if args.format == "shopify_csv" else []
+    content, suffix, fields = build_output(prepared, args.format, field_mappings)
     base = args.output or f"{manifest['job_id']}-{args.format.replace('_', '-')}"
     output_path = Path(base)
     if not output_path.is_absolute():
@@ -190,6 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ids", help="Optional comma-separated item ID subset; all must be approved.")
     parser.add_argument("--output", help="Optional output filename relative to brandlab/exports.")
     parser.add_argument("--include-exported", action="store_true", help="Include previously exported approved items.")
+    parser.add_argument("--field-mapping", help="Optional YAML mapping file; defaults to brandlab/field-mappings.yaml.")
     return parser
 
 

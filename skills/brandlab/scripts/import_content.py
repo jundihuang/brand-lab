@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -13,26 +12,15 @@ import yaml
 
 from brandlab_lib import (
     ACTIONABLE_CATALOG_STATUSES, BrandLabError, atomic_write_text, append_history,
-    load_brand, read_catalog, read_csv_rows, read_jsonl, resolve_workspace,
+    DEFAULT_CSV_IMPORT_MAPPINGS, GENERIC_CSV_SOURCE_COLUMNS, load_brand,
+    load_field_mappings, read_catalog, read_csv_rows, read_jsonl,
+    read_text_utf8, resolve_workspace, SUPPORTED_RESOURCE_TYPES,
+    normalized_csv_header,
     sha256_text, slug, utc_now, write_catalog, write_jsonl_contract,
 )
 
 
-CSV_FIELD_MAPPINGS = {
-    "title": "product_title",
-    "product title": "product_title",
-    "body html": "product_description",
-    "body (html)": "product_description",
-    "body": "product_description",
-    "seo title": "seo_title",
-    "seo description": "seo_description",
-    "collection title": "collection_title",
-    "collection description": "collection_description",
-    "page title": "page_title",
-    "page body": "page_body",
-    "blog title": "blog_title",
-    "blog body": "blog_body",
-}
+CSV_FIELD_MAPPINGS = DEFAULT_CSV_IMPORT_MAPPINGS
 
 
 def stable_id(*parts: object) -> str:
@@ -41,7 +29,7 @@ def stable_id(*parts: object) -> str:
 
 
 def normalized_key(value: str) -> str:
-    return re.sub(r"[\s_()-]+", " ", value.strip()).casefold()
+    return normalized_csv_header(value)
 
 
 def parse_front_matter(text: str) -> tuple[dict[str, Any], str]:
@@ -57,23 +45,24 @@ def parse_front_matter(text: str) -> tuple[dict[str, Any], str]:
     return {}, text
 
 
-def records_from_csv(path: Path, source_locale: str) -> list[dict[str, Any]]:
+def records_from_csv(path: Path, field_mappings: dict[str, str]) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for row_no, row in enumerate(read_csv_rows(path), 2):
-        handle = row.get("Handle") or row.get("handle") or ""
+        display_by_header = {normalized_key(key): key for key in row}
         normalized = {normalized_key(key): value for key, value in row.items()}
-        explicit_resource = normalized.get("resource type") or normalized.get("resource_type")
-        explicit_source = normalized.get("source") or normalized.get("translation source")
+        handle = normalized.get("handle", "")
+        explicit_resource = normalized.get("resource type", "")
+        explicit_source = next((normalized[key] for key in GENERIC_CSV_SOURCE_COLUMNS if normalized.get(key, "")), "")
         if explicit_source:
             resource = explicit_resource or "page_body"
             records.append({
-                "external_id": normalized.get("id") or handle,
+                "external_id": normalized.get("id", "") or handle,
                 "resource_type": resource,
                 "source": explicit_source,
                 "context": {"source_row": row_no, "handle": handle},
             })
             continue
-        for key, resource_type in CSV_FIELD_MAPPINGS.items():
+        for key, resource_type in field_mappings.items():
             value = normalized.get(key, "")
             if not value.strip():
                 continue
@@ -81,7 +70,7 @@ def records_from_csv(path: Path, source_locale: str) -> list[dict[str, Any]]:
                 "external_id": handle,
                 "resource_type": resource_type,
                 "source": value,
-                "context": {"source_row": row_no, "handle": handle, "field": key},
+                "context": {"source_row": row_no, "handle": handle, "field": display_by_header.get(key, key)},
             })
     return records
 
@@ -90,6 +79,8 @@ def records_from_json(path: Path, source_locale: str) -> list[dict[str, Any]]:
     try:
         with path.open("r", encoding="utf-8-sig") as handle:
             value = json.load(handle)
+    except UnicodeError as exc:
+        raise BrandLabError(f"{path}: file is not valid UTF-8. Re-export it as UTF-8 or UTF-8 with BOM.") from exc
     except json.JSONDecodeError as exc:
         raise BrandLabError(f"{path}: invalid JSON at line {exc.lineno}. Fix JSON syntax and retry.") from exc
     if isinstance(value, dict):
@@ -115,7 +106,7 @@ def records_from_json(path: Path, source_locale: str) -> list[dict[str, Any]]:
 
 
 def records_from_markdown(path: Path) -> list[dict[str, Any]]:
-    front, body = parse_front_matter(path.read_text(encoding="utf-8-sig"))
+    front, body = parse_front_matter(read_text_utf8(path))
     title = str(front.get("title", "")).strip()
     resource_type = str(front.get("resource_type", "page_body")).strip()
     records: list[dict[str, Any]] = []
@@ -128,7 +119,7 @@ def records_from_markdown(path: Path) -> list[dict[str, Any]]:
 
 
 def records_from_text(path: Path) -> list[dict[str, Any]]:
-    source = path.read_text(encoding="utf-8-sig").strip()
+    source = read_text_utf8(path).strip()
     if not source:
         return []
     resource_type = "page_body"
@@ -142,10 +133,10 @@ def records_from_text(path: Path) -> list[dict[str, Any]]:
     return [{"external_id": path.stem, "resource_type": resource_type, "source": source, "context": {"imported_from": path.name}}]
 
 
-def read_records(path: Path, source_locale: str) -> list[dict[str, Any]]:
+def read_records(path: Path, source_locale: str, field_mappings: dict[str, str]) -> list[dict[str, Any]]:
     suffix = path.suffix.casefold()
     if suffix == ".csv":
-        return records_from_csv(path, source_locale)
+        return records_from_csv(path, field_mappings)
     if suffix in {".json", ".jsonl"}:
         if suffix == ".jsonl":
             records = []
@@ -208,6 +199,8 @@ def import_files(args: argparse.Namespace) -> None:
         raise BrandLabError("--target-locales: no target locale supplied and no enabled market found.")
 
     catalog = read_catalog(workspace)
+    mapping_path = Path(args.field_mapping).expanduser() if args.field_mapping else workspace / "field-mappings.yaml"
+    field_mappings = load_field_mappings(mapping_path, explicit=bool(args.field_mapping))["import_csv"]
     by_id = {row["id"]: row for row in catalog if isinstance(row, dict) and row.get("id")}
     counts = {"new": 0, "changed": 0, "unchanged": 0, "skipped": 0}
     imported_rows: list[dict[str, Any]] = []
@@ -220,7 +213,7 @@ def import_files(args: argparse.Namespace) -> None:
             suffix = path.suffix.casefold()
             file_source_locale = ""
             if suffix in {".json", ".jsonl", ".md", ".markdown"}:
-                raw = path.read_text(encoding="utf-8-sig")
+                raw = read_text_utf8(path)
                 try:
                     candidate = json.loads(raw) if suffix in {".json", ".jsonl"} else yaml.safe_load(raw.split("---\n", 2)[1] if raw.startswith("---\n") else {})
                 except Exception:
@@ -230,16 +223,12 @@ def import_files(args: argparse.Namespace) -> None:
             if not file_source_locale:
                 raise BrandLabError(f"{path}: source locale is not declared. Add source_locale metadata or pass --source-locale.")
         source_locale_by_file[str(path)] = file_source_locale
-        records = read_records(path, file_source_locale)
+        records = read_records(path, file_source_locale, field_mappings)
         if not records:
             counts["skipped"] += 1
         for record in records:
             resource_type = str(record.get("resource_type", "")).strip()
-            if resource_type not in {
-                "product_title", "product_description", "product_variant", "collection_title",
-                "collection_description", "page_title", "page_body", "blog_title", "blog_body",
-                "seo_title", "seo_description", "care_and_compliance",
-            }:
+            if resource_type not in SUPPORTED_RESOURCE_TYPES:
                 raise BrandLabError(
                     f"{path}: resource_type {resource_type} is unsupported. "
                     "Use product_title, product_description, seo_title, seo_description, page_body, blog_body, or care_and_compliance."
@@ -327,6 +316,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source-locale", help="Source locale for all files; required unless file metadata declares it.")
     parser.add_argument("--target-locales", help="Comma-separated target locales; defaults to enabled brand markets.")
     parser.add_argument("--file", action="append", help="Specific file path; repeat for multiple files. Defaults to all inbox files.")
+    parser.add_argument("--field-mapping", help="Optional YAML mapping file; defaults to brandlab/field-mappings.yaml.")
     return parser
 
 

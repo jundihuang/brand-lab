@@ -88,6 +88,8 @@ If the user has no source files, ask them to place CSV, JSON, JSONL, Markdown, H
    python3 scripts/load_config.py --workspace brandlab
    ```
 
+   If source CSV headers use another language or a custom Shopify export shape, check or create `brandlab/field-mappings.yaml`. Pass `--field-mapping PATH` when the file is outside the workspace.
+
 5. Prepare model translation work:
 
    ```bash

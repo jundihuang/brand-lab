@@ -604,6 +604,8 @@ Definition of done:
 
 ### M3.3 Import/export hardening
 
+Status: Completed 2026-10-15.
+
 Tasks:
 
 1. Improve Shopify-style CSV mapping.
@@ -618,6 +620,8 @@ Definition of done:
 1. CSV with multiline HTML can be imported and exported safely.
 2. Export format is predictable.
 3. Round-trip tests cover key field types.
+
+Evidence: `docs/M3.3-ACCEPTANCE.md`; 79 tests passed.
 
 ### M3.4 Usability hardening
 
