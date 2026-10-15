@@ -66,7 +66,7 @@ def verify_latest_digests(workspace: Path, plan: dict[str, Any], args: argparse.
             DIGEST_QUERY, {"resourceId": resource_id}, operation_kind="read",
             operation_id=f"digest_{slug(plan['batch_id'])}_{utc_now().replace(':', '').replace('-', '', 2).replace('+', 'z')}",
         )
-        resource = result["response"].get("data", {}).get("translatableResource", {})
+        resource = ShopifyConnector.response_data(result["response"]).get("translatableResource", {})
         contents = resource.get("translatableContent", []) if isinstance(resource, dict) else []
         by_key = {row.get("key"): row.get("digest") for row in contents if isinstance(row, dict)}
         for operation in plan["operations"]:
@@ -129,7 +129,7 @@ def execute(args: argparse.Namespace) -> int:
     except BrandLabError as exc:
         result_path = fail(workspace, plan_path, plan, job_dir, manifest, str(exc))
         raise BrandLabError(f"{plan_path}: Shopify execution failed. Result: {result_path} Error: {exc}")
-    data = result["response"].get("data")
+    data = mutation_connector.parse_data(result)
     if not isinstance(data, dict):
         result_path = fail(workspace, plan_path, plan, job_dir, manifest, "Shopify response data is missing.")
         raise BrandLabError(f"{plan_path}: execution failed. Result: {result_path}")

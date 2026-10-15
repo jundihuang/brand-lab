@@ -73,5 +73,8 @@ class ShopifyModeTestCase(BrandLabTestCase):
     def load_json(self, path: Path) -> dict:
         return json.loads(path.read_text())
 
+    def read_script(self, name: str) -> str:
+        return (SKILL_ROOT / "scripts" / name).read_text()
+
     def history_events(self, workspace: Path) -> list[str]:
         return [json.loads(line)["event_type"] for line in (workspace / "history/events.jsonl").read_text().splitlines()]

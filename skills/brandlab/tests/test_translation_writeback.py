@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from shopify_case import FIXTURES, ShopifyModeTestCase
+from shopify_connector import ShopifyConnector
 
 
 class TranslationWritebackTest(ShopifyModeTestCase):
@@ -49,6 +50,11 @@ class TranslationWritebackTest(ShopifyModeTestCase):
         self.assertEqual(plan["plan_type"], "translation_register")
         self.assertEqual(plan["shopify_locale"], "it")
         self.assertIn("translationsRegister", plan["graphql"]["query"])
+        self.assertIn("$resourceIds: [ID!]!", self.read_script("verify_translation_writeback.py"))
+        self.assertEqual(
+            ShopifyConnector.response_data({"translatableResource": {"resourceId": "gid://shopify/Product/456"}}),
+            {"translatableResource": {"resourceId": "gid://shopify/Product/456"}},
+        )
         self.assertEqual(plan["operations"][0]["translatable_content_digest"], "digest-silk")
         self.run_cli(
             "approve_mutation_plan.py", "--workspace", str(workspace), "--plan", str(plan_path), "--reviewer", "Jayce",

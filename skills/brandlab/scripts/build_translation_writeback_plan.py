@@ -55,7 +55,7 @@ def build_plan(args: argparse.Namespace) -> None:
         raise BrandLabError(f"{job_dir / 'manifest.json'}: job must be approved Shopify Controlled mode before planning writeback.")
     connector = ShopifyConnector(workspace, provider=args.provider, fixture=Path(args.fixture).resolve() if args.fixture else None)
     market_entry = find_market(brand_data, str(manifest["market"]))
-    shopify_locale = str(market_entry.get("shopify_locale") or args.shopify_locale or "")
+    shopify_locale = str(args.shopify_locale or market_entry.get("shopify_locale") or "")
     if not shopify_locale:
         raise BrandLabError(f"{workspace / 'brand.yaml'}: market {manifest['market']} needs shopify_locale for Translation API writeback.")
     approval_path = job_dir / "approvals.json"

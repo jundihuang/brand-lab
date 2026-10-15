@@ -103,9 +103,7 @@ def update_config(workspace: Path, args: argparse.Namespace, passed: bool) -> tu
         )
     if args.enable_mutations and not args.reviewer:
         raise BrandLabError("--enable-mutations requires --reviewer to record explicit human responsibility.")
-    mutations_allowed = bool(config.get("allow_mutations", False))
-    if args.enable_mutations:
-        mutations_allowed = True
+    mutations_allowed = bool(args.enable_mutations)
 
     selected_store = args.store or current_store
     shopify_config = {

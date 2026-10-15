@@ -15,7 +15,7 @@ from mutation_lib import load_plan, save_plan
 from shopify_connector import ShopifyConnector
 
 
-QUERY = '''query VerifyTranslationWriteback($resourceIds: [ID!], $locale: String!) {
+QUERY = '''query VerifyTranslationWriteback($resourceIds: [ID!]!, $locale: String!) {
   translatableResourcesByIds(first: 10, resourceIds: $resourceIds) {
     nodes {
       resourceId
@@ -48,7 +48,7 @@ def verify(args: argparse.Namespace) -> None:
         {"resourceIds": sorted({operation["shopify_resource_id"] for operation in plan["operations"]}), "locale": plan["shopify_locale"]},
         operation_kind="read", operation_id=f"verify_translation_{result['execution_id']}",
     )
-    nodes = shopify_result["response"].get("data", {}).get("translatableResourcesByIds", {}).get("nodes", [])
+    nodes = ShopifyConnector.response_data(shopify_result["response"]).get("translatableResourcesByIds", {}).get("nodes", [])
     by_resource = {node.get("resourceId"): node for node in nodes if isinstance(node, dict)}
     for item in result["items"]:
         if item.get("status") != "success":

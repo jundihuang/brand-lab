@@ -256,11 +256,18 @@ class ShopifyConnector:
         return {"response": response, "output_path": output_path, "validation": validation, "operation_id": operation_id}
 
     def parse_data(self, result: dict[str, Any]) -> dict[str, Any]:
-        response = result["response"]
-        data = response.get("data")
+        data = self.response_data(result["response"])
         if not isinstance(data, dict):
             raise BrandLabError(f"Shopify response {result['operation_id']}: data is missing or not an object. Inspect {result['output_path']}.")
         return data
+
+    @staticmethod
+    def response_data(response: Any) -> dict[str, Any]:
+        """Return GraphQL data for both standard and Shopify CLI unwrapped responses."""
+        if not isinstance(response, dict):
+            return {}
+        data = response.get("data")
+        return data if isinstance(data, dict) else response
 
 
 def load_approved_plan(path: Path) -> dict[str, Any]:

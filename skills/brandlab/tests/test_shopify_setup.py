@@ -55,3 +55,9 @@ class ShopifySetupTest(ShopifyModeTestCase):
         brand = yaml.safe_load((workspace / "brand.yaml").read_text())
         self.assertTrue(brand["shopify"]["allow_mutations"])
         self.assertEqual(brand["shopify"]["mutation_enabled_by"], "Jayce")
+        self.run_cli(
+            "shopify_setup.py", "--workspace", str(workspace), "--allow-reads",
+            "--fixture", str(FIXTURES / "setup-ok.json"),
+        )
+        brand = yaml.safe_load((workspace / "brand.yaml").read_text())
+        self.assertFalse(brand["shopify"]["allow_mutations"])
